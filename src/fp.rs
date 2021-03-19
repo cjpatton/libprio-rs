@@ -6,9 +6,9 @@ use rand::Rng;
 
 // Parameters of a finite field with prime p < 2^126. Field elements are represented as u128's.
 pub struct Fp {
-    p: u128,  // the prime modulus p
-    mu: u64,  // mu = -p^(-1) mod 2^64
-    r2: u128, // r2 = (2^128)^2 mod p
+    pub p: u128,  // the prime modulus p
+    pub mu: u64,  // mu = -p^(-1) mod 2^64
+    pub r2: u128, // r2 = (2^128)^2 mod p
 }
 
 impl Fp {
@@ -128,8 +128,7 @@ impl Fp {
         (zz[2] as u128) | ((zz[3] as u128) << 64)
     }
 
-    pub fn inv(&self, x: u128) -> u128 {
-        let exp = self.p - 2;
+    pub fn pow(&self, x: u128, exp: u128) -> u128 {
         let mut t = self.elem(1);
         for i in (0..128).rev() {
             t = self.mul(t, t);
@@ -138,6 +137,10 @@ impl Fp {
             }
         }
         t
+    }
+
+    pub fn inv(&self, x: u128) -> u128 {
+        self.pow(x, self.p - 2)
     }
 
     pub fn neg(&self, x: u128) -> u128 {

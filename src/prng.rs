@@ -61,7 +61,7 @@ fn random_field_from_seed(seed: &[u8], length: usize) -> Vec<Field> {
         cipher.apply_keystream(&mut buffer);
 
         // rejection sampling
-        for chunk in buffer.chunks_exact(std::mem::size_of::<Field>()) {
+        for chunk in buffer.chunks_exact(4) {
             let integer = u32::from_le_bytes(chunk.try_into().unwrap());
             if integer < MODULUS {
                 output[output_written] = Field::from(integer);

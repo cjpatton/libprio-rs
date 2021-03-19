@@ -110,7 +110,7 @@ pub fn serialize(data: &[Field]) -> Vec<u8> {
 
 /// Get a vector of field elements from a byte slice
 pub fn deserialize(data: &[u8]) -> Vec<Field> {
-    let field_size = std::mem::size_of::<Field>();
+    let field_size = 4;
 
     let mut vec = Vec::with_capacity(data.len() / field_size);
     use std::convert::TryInto;
