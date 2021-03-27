@@ -11,6 +11,7 @@
 
 pub mod client;
 pub mod encrypt;
+pub mod fft;
 pub mod finite_field;
 mod fp;
 mod polynomial;
