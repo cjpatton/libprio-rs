@@ -14,7 +14,7 @@ pub mod encrypt;
 pub mod fft;
 pub mod finite_field;
 mod fp;
-mod polynomial;
+pub mod polynomial;
 mod prng;
 pub mod server;
 pub mod util;
