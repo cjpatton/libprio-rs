@@ -187,14 +187,16 @@ pub fn poly_interpret_eval(
 
 #[test]
 fn test_roots() {
+    use std::convert::TryFrom;
+
     let count = 128;
     let roots = fft_get_roots(count, false);
     let roots_inv = fft_get_roots(count, true);
 
     for i in 0..count {
         assert_eq!(roots[i] * roots_inv[i], 1);
-        assert_eq!(roots[i].pow(Field::from(count as u32)), 1);
-        assert_eq!(roots_inv[i].pow(Field::from(count as u32)), 1);
+        assert_eq!(roots[i].pow(u32::try_from(count).unwrap()), 1);
+        assert_eq!(roots_inv[i].pow(u32::try_from(count).unwrap()), 1);
     }
 }
 
@@ -213,10 +215,11 @@ fn test_horner_eval() {
 
 #[test]
 fn test_fft() {
+    use rand::prelude::*;
+    use std::convert::TryFrom;
+
     let count = 128;
     let mut mem = PolyAuxMemory::new(count / 2);
-
-    use rand::prelude::*;
 
     let mut poly = vec![Field::from(0); count];
     let mut points2 = vec![Field::from(0); count];
@@ -258,7 +261,7 @@ fn test_fft() {
     for i in 0..count {
         let mut should_be = Field::from(0);
         for j in 0..count {
-            should_be = mem.roots_2n[i].pow(Field::from(j as u32)) * points[j] + should_be;
+            should_be = mem.roots_2n[i].pow(u32::try_from(j).unwrap()) * points[j] + should_be;
         }
         assert_eq!(should_be, poly[i]);
     }

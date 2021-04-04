@@ -8,7 +8,7 @@ use std::{
     cmp::min,
     convert::TryFrom,
     fmt::{Debug, Display, Formatter},
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Shr, Sub, SubAssign},
 };
 
 use rand::Rng;
@@ -46,11 +46,12 @@ pub trait FieldElement:
     /// The integer representation of the field element.
     type Integer: Copy
         + Debug
+        + Shr<Output = <Self as FieldElement>::Integer>
         + Sub<Output = <Self as FieldElement>::Integer>
         + TryFrom<usize, Error = Self::IntegerTryFromError>;
 
     /// Modular exponentation, i.e., `self^exp (mod p)`.
-    fn pow(&self, exp: Self) -> Self; // TODO(cjpatton) exp should have type Self::Integer
+    fn pow(&self, exp: Self::Integer) -> Self;
 
     /// Modular inversion, i.e., `self^-1 (mod p)`. If `self` is 0, then the output is undefined.
     fn inv(&self) -> Self;
@@ -214,8 +215,8 @@ macro_rules! make_field {
             type Integer = $int;
             type IntegerTryFromError = <Self::Integer as TryFrom<usize>>::Error;
 
-            fn pow(&self, exp: Self) -> Self {
-                Self($fp.pow(self.0, $fp.from_elem(exp.0)))
+            fn pow(&self, exp: Self::Integer) -> Self {
+                Self($fp.pow(self.0, u128::try_from(exp).unwrap()))
             }
 
             fn inv(&self) -> Self {
@@ -282,71 +283,6 @@ make_field!(
     FP126
 );
 
-#[test]
-fn test_arithmetic() {
-    // TODO(cjpatton) Add tests for the other fields.
-    use rand::prelude::*;
-
-    let modulus = Field::modulus();
-
-    // add
-    assert_eq!(Field::from(modulus - 1) + Field::from(1), 0);
-    assert_eq!(Field::from(modulus - 2) + Field::from(2), 0);
-    assert_eq!(Field::from(modulus - 2) + Field::from(3), 1);
-    assert_eq!(Field::from(1) + Field::from(1), 2);
-    assert_eq!(Field::from(2) + Field::from(modulus), 2);
-    assert_eq!(Field::from(3) + Field::from(modulus - 1), 2);
-
-    // sub
-    assert_eq!(Field::from(0) - Field::from(1), modulus - 1);
-    assert_eq!(Field::from(1) - Field::from(2), modulus - 1);
-    assert_eq!(Field::from(15) - Field::from(3), 12);
-    assert_eq!(Field::from(1) - Field::from(1), 0);
-    assert_eq!(Field::from(2) - Field::from(modulus), 2);
-    assert_eq!(Field::from(3) - Field::from(modulus - 1), 4);
-
-    // add + sub
-    for _ in 0..100 {
-        let f = Field::from(random::<u32>());
-        let g = Field::from(random::<u32>());
-        assert_eq!(f + g - f - g, 0);
-        assert_eq!(f + g - g, f);
-        assert_eq!(f + g - f, g);
-    }
-
-    // mul
-    assert_eq!(Field::from(35) * Field::from(123), 4305);
-    assert_eq!(Field::from(1) * Field::from(modulus), 0);
-    assert_eq!(Field::from(0) * Field::from(123), 0);
-    assert_eq!(Field::from(123) * Field::from(0), 0);
-    assert_eq!(Field::from(123123123) * Field::from(123123123), 1237630077);
-
-    // div
-    assert_eq!(Field::from(35) / Field::from(5), 7);
-    assert_eq!(Field::from(35) / Field::from(0), 0);
-    assert_eq!(Field::from(0) / Field::from(5), 0);
-    assert_eq!(Field::from(1237630077) / Field::from(123123123), 123123123);
-
-    assert_eq!(Field::from(0).inv(), 0);
-
-    // mul and div
-    let uniform = rand::distributions::Uniform::from(1..modulus);
-    let mut rng = thread_rng();
-    for _ in 0..100 {
-        // non-zero element
-        let f = Field::from(uniform.sample(&mut rng));
-        assert_eq!(f * f.inv(), 1);
-        assert_eq!(f.inv() * f, 1);
-    }
-
-    // pow
-    assert_eq!(Field::from(2).pow(3.into()), 8);
-    assert_eq!(Field::from(3).pow(9.into()), 19683);
-    assert_eq!(Field::from(51).pow(27.into()), 3760729523);
-    assert_eq!(Field::from(432).pow(0.into()), 1);
-    assert_eq!(Field(0).pow(123.into()), 0);
-}
-
 /// Merge two vectors of fields by summing other_vector into accumulator.
 ///
 /// # Errors
@@ -369,6 +305,7 @@ pub fn merge_vector(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fp::MAX_ROOTS;
     use crate::util::vector_with_length;
     use assert_matches::assert_matches;
 
@@ -387,5 +324,98 @@ mod tests {
         let wrong_len = vector_with_length(9);
         let result = merge_vector(&mut lhs, &wrong_len);
         assert_matches!(result, Err(FiniteFieldError::InputSizeMismatch));
+    }
+
+    fn arithmetic_test<F: FieldElement>() {
+        let mut rng = rand::thread_rng();
+        let int_modulus = F::modulus();
+        let int_one = F::Integer::try_from(1).unwrap();
+        let zero = F::zero();
+        let one = F::root(0).unwrap();
+        let two = F::from(F::Integer::try_from(2).unwrap());
+        let four = F::from(F::Integer::try_from(4).unwrap());
+
+        // add
+        assert_eq!(F::from(int_modulus - int_one) + one, zero);
+        assert_eq!(one + one, two);
+        assert_eq!(two + F::from(int_modulus), two);
+
+        // sub
+        assert_eq!(zero - one, F::from(int_modulus - int_one));
+        assert_eq!(one - one, zero);
+        assert_eq!(two - F::from(int_modulus), two);
+        assert_eq!(one - F::from(int_modulus - int_one), two);
+
+        // add + sub
+        for _ in 0..100 {
+            let f = F::rand(&mut rng);
+            let g = F::rand(&mut rng);
+            assert_eq!(f + g - f - g, zero);
+            assert_eq!(f + g - g, f);
+            assert_eq!(f + g - f, g);
+        }
+
+        // mul
+        assert_eq!(two * two, four);
+        assert_eq!(two * one, two);
+        assert_eq!(two * zero, zero);
+        assert_eq!(one * F::from(int_modulus), zero);
+
+        // div
+        assert_eq!(four / two, two);
+        assert_eq!(two / two, one);
+        assert_eq!(zero / two, zero);
+        assert_eq!(two / zero, zero); // Undefined behavior
+        assert_eq!(zero.inv(), zero); // Undefined behavior
+
+        // mul + div
+        for _ in 0..100 {
+            let f = F::rand(&mut rng);
+            if f == zero {
+                println!("skipped zero");
+                continue;
+            }
+            assert_eq!(f * f.inv(), one);
+            assert_eq!(f.inv() * f, one);
+        }
+
+        // pow
+        assert_eq!(two.pow(F::Integer::try_from(0).unwrap()), one);
+        assert_eq!(two.pow(int_one), two);
+        assert_eq!(two.pow(F::Integer::try_from(2).unwrap()), four);
+        assert_eq!(two.pow(int_modulus - int_one), one);
+        assert_eq!(two.pow(int_modulus), two);
+
+        // roots
+        let mut int_order = F::generator_order();
+        for l in 0..MAX_ROOTS + 1 {
+            assert_eq!(
+                F::generator().pow(int_order),
+                F::root(l).unwrap(),
+                "failure for F::root({})",
+                l
+            );
+            int_order = int_order >> int_one;
+        }
+    }
+
+    #[test]
+    fn test_field32() {
+        arithmetic_test::<Field>();
+    }
+
+    #[test]
+    fn test_field64() {
+        arithmetic_test::<Field64>();
+    }
+
+    #[test]
+    fn test_field80() {
+        arithmetic_test::<Field80>();
+    }
+
+    #[test]
+    fn test_field126() {
+        arithmetic_test::<Field126>();
     }
 }

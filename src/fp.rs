@@ -456,11 +456,11 @@ mod tests {
             assert_eq!(t.fp.from_elem(t.fp.pow(t.fp.g, t.expected_order)), 1);
 
             // Test arithmetic using the field parameters.
-            test_arithmetic(&t.fp);
+            arithmetic_test(&t.fp);
         }
     }
 
-    fn test_arithmetic(fp: &FieldParameters) {
+    fn arithmetic_test(fp: &FieldParameters) {
         let mut rng = rand::thread_rng();
         let big_p = &fp.p.to_bigint().unwrap();
 
