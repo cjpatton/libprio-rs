@@ -29,7 +29,7 @@ pub struct ValidationMemory {
     points_f: Vec<Field>,
     points_g: Vec<Field>,
     points_h: Vec<Field>,
-    poly_mem: PolyAuxMemory,
+    poly_mem: PolyAuxMemory<Field>,
 }
 
 impl ValidationMemory {

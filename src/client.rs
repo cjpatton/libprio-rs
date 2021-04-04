@@ -18,7 +18,7 @@ pub struct Client {
     points_g: Vec<Field>,
     evals_f: Vec<Field>,
     evals_g: Vec<Field>,
-    poly_mem: PolyAuxMemory,
+    poly_mem: PolyAuxMemory<Field>,
     public_key1: PublicKey,
     public_key2: PublicKey,
 }
@@ -104,7 +104,7 @@ fn interpolate_and_evaluate_at_2n(
     n: usize,
     points_in: &[Field],
     evals_out: &mut [Field],
-    mem: &mut PolyAuxMemory,
+    mem: &mut PolyAuxMemory<Field>,
 ) {
     // interpolate through roots of unity
     poly_fft(
