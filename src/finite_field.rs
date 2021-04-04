@@ -13,6 +13,7 @@ use std::{
 
 use rand::Rng;
 
+// TODO(cjpatton) Rename To FieldError?
 /// Possible errors from finite field operations.
 #[derive(Debug, thiserror::Error)]
 pub enum FiniteFieldError {
