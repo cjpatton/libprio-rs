@@ -44,7 +44,7 @@ fn random_field_from_seed(seed: &[u8], length: usize) -> Vec<Field> {
     let mut output = super::util::vector_with_length(length);
     let mut output_written = 0;
 
-    let length_in_blocks = length * std::mem::size_of::<Field>() / BLOCK_SIZE;
+    let length_in_blocks = length * Field::BYTES / BLOCK_SIZE;
     // add one more block to account for rejection and roundoff errors
     let buffer_len_in_blocks = std::cmp::min(MAXIMUM_BUFFER_SIZE_IN_BLOCKS, length_in_blocks + 1);
     // Note: buffer_len must be a multiple of BLOCK_SIZE, so that different buffer
@@ -60,12 +60,7 @@ fn random_field_from_seed(seed: &[u8], length: usize) -> Vec<Field> {
 
         cipher.apply_keystream(&mut buffer);
 
-        // rejection sampling
-        //
-        // TODO(cjpatton): Once implemented, use FieldParameters::size() and
-        // FieldElement::form_bytes() to implement this loop.
-        let field_size = std::mem::size_of::<<Field as FieldElement>::Integer>();
-        for chunk in buffer.chunks_exact(field_size) {
+        for chunk in buffer.chunks_exact(Field::BYTES) {
             let integer =
                 <Field as FieldElement>::Integer::from_le_bytes(chunk.try_into().unwrap());
             if integer < Field::modulus() {

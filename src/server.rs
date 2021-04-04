@@ -77,7 +77,7 @@ impl Server {
     fn deserialize_share(&self, encrypted_share: &[u8]) -> Result<Vec<Field>, ServerError> {
         let share = decrypt_share(encrypted_share, &self.private_key)?;
         Ok(if self.is_first_server {
-            deserialize(&share)
+            deserialize(&share)?
         } else {
             let len = proof_length(self.dimension);
             extract_share_from_seed(len, &share)

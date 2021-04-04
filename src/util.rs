@@ -3,7 +3,7 @@
 
 //! Utility functions for handling Prio stuff.
 
-use crate::finite_field::{Field, FieldElement};
+use crate::finite_field::{Field, FieldElement, FiniteFieldError};
 
 /// Convenience function for initializing fixed sized vectors of Field elements.
 pub fn vector_with_length(len: usize) -> Vec<Field> {
@@ -96,35 +96,21 @@ pub fn unpack_proof_mut(proof: &mut [Field], dimension: usize) -> Option<Unpacke
 }
 
 /// Get a byte array from a slice of field elements
-pub fn serialize(data: &[Field]) -> Vec<u8> {
-    let field_size = std::mem::size_of::<<Field as FieldElement>::Integer>();
-    let mut vec = Vec::with_capacity(data.len() * field_size);
-
+pub fn serialize<F: FieldElement>(data: &[F]) -> Vec<u8> {
+    let mut vec = Vec::<u8>::with_capacity(data.len() * F::BYTES);
     for elem in data.iter() {
-        // TODO(cjpatton) Implement FieldElement::bytes() that encodes each field element using
-        // FieldParameters::size() bytes.
-        let int = <Field as FieldElement>::Integer::from(*elem);
-        vec.extend(int.to_le_bytes().iter());
+        elem.append_to(&mut vec);
     }
-
     vec
 }
 
 /// Get a vector of field elements from a byte slice
-pub fn deserialize(data: &[u8]) -> Vec<Field> {
-    let field_size = std::mem::size_of::<<Field as FieldElement>::Integer>();
-
-    let mut vec = Vec::with_capacity(data.len() / field_size);
-    use std::convert::TryInto;
-
-    for chunk in data.chunks_exact(field_size) {
-        // TODO(cjpatton) Implement FieldElement::from_bytes() that decodes field elements from a
-        // string with FieldParameters::size() bytes.
-        let integer = <Field as FieldElement>::Integer::from_le_bytes(chunk.try_into().unwrap());
-        vec.push(Field::from(integer));
+pub fn deserialize<F: FieldElement>(data: &[u8]) -> Result<Vec<F>, FiniteFieldError> {
+    let mut vec = Vec::<F>::with_capacity(data.len() / F::BYTES);
+    for chunk in data.chunks_exact(F::BYTES) {
+        vec.push(F::read_from(chunk)?);
     }
-
-    vec
+    Ok(vec)
 }
 
 /// Add two Field element arrays together elementwise.
@@ -199,7 +185,7 @@ pub mod tests {
     fn serialization() {
         let field = [Field::from(1), Field::from(0x99997)];
         let bytes = serialize(&field);
-        let field_deserialized = deserialize(&bytes);
+        let field_deserialized = deserialize::<Field>(&bytes).unwrap();
         assert_eq!(field_deserialized, field);
     }
 }
