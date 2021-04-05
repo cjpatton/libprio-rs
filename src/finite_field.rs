@@ -56,6 +56,7 @@ pub trait FieldElement:
     /// The integer representation of the field element.
     type Integer: Copy
         + Debug
+        + PartialOrd
         + Div<Output = <Self as FieldElement>::Integer>
         + Shr<Output = <Self as FieldElement>::Integer>
         + Sub<Output = <Self as FieldElement>::Integer>

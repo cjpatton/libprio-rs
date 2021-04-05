@@ -4,31 +4,33 @@
 //! Prio client
 
 use crate::encrypt::*;
-use crate::finite_field::*;
+use crate::finite_field::FieldElement;
 use crate::polynomial::*;
 use crate::util::*;
+
+use std::convert::TryFrom;
 
 /// The main object that can be used to create Prio shares
 ///
 /// Client is used to create Prio shares.
 #[derive(Debug)]
-pub struct Client {
+pub struct Client<F: FieldElement> {
     dimension: usize,
-    points_f: Vec<Field>,
-    points_g: Vec<Field>,
-    evals_f: Vec<Field>,
-    evals_g: Vec<Field>,
-    poly_mem: PolyAuxMemory<Field>,
+    points_f: Vec<F>,
+    points_g: Vec<F>,
+    evals_f: Vec<F>,
+    evals_g: Vec<F>,
+    poly_mem: PolyAuxMemory<F>,
     public_key1: PublicKey,
     public_key2: PublicKey,
 }
 
-impl Client {
+impl<F: FieldElement> Client<F> {
     /// Construct a new Prio client
     pub fn new(dimension: usize, public_key1: PublicKey, public_key2: PublicKey) -> Option<Self> {
         let n = (dimension + 1).next_power_of_two();
 
-        if 2 * n > Field::generator_order() as usize {
+        if F::Integer::try_from(2 * n).unwrap() > F::generator_order() {
             // too many elements for this field, not enough roots of unity
             return None;
         }
@@ -46,8 +48,8 @@ impl Client {
     }
 
     /// Construct a pair of encrypted shares based on the input data.
-    pub fn encode_simple(&mut self, data: &[Field]) -> Result<(Vec<u8>, Vec<u8>), EncryptError> {
-        let copy_data = |share_data: &mut [Field]| {
+    pub fn encode_simple(&mut self, data: &[F]) -> Result<(Vec<u8>, Vec<u8>), EncryptError> {
+        let copy_data = |share_data: &mut [F]| {
             share_data[..].clone_from_slice(data);
         };
         self.encode_with(copy_data)
@@ -57,9 +59,9 @@ impl Client {
     ///
     /// This might be slightly more efficient on large vectors, because one can
     /// avoid copying the input data.
-    pub fn encode_with<F>(&mut self, init_function: F) -> Result<(Vec<u8>, Vec<u8>), EncryptError>
+    pub fn encode_with<G>(&mut self, init_function: G) -> Result<(Vec<u8>, Vec<u8>), EncryptError>
     where
-        F: FnOnce(&mut [Field]),
+        G: FnOnce(&mut [F]),
     {
         let mut proof = vector_with_length(proof_length(self.dimension));
         // unpack one long vector to different subparts
@@ -90,8 +92,8 @@ impl Client {
 
 /// Convenience function if one does not want to reuse
 /// [`Client`](struct.Client.html).
-pub fn encode_simple(
-    data: &[Field],
+pub fn encode_simple<F: FieldElement>(
+    data: &[F],
     public_key1: PublicKey,
     public_key2: PublicKey,
 ) -> Option<(Vec<u8>, Vec<u8>)> {
@@ -100,11 +102,11 @@ pub fn encode_simple(
     client_memory.encode_simple(data).ok()
 }
 
-fn interpolate_and_evaluate_at_2n(
+fn interpolate_and_evaluate_at_2n<F: FieldElement>(
     n: usize,
-    points_in: &[Field],
-    evals_out: &mut [Field],
-    mem: &mut PolyAuxMemory<Field>,
+    points_in: &[F],
+    evals_out: &mut [F],
+    mem: &mut PolyAuxMemory<F>,
 ) {
     // interpolate through roots of unity
     poly_fft(
@@ -130,20 +132,21 @@ fn interpolate_and_evaluate_at_2n(
 ///
 /// Based on Theorem 2.3.3 from Henry Corrigan-Gibbs' dissertation
 /// This constructs the output \pi by doing the necessesary calculations
-fn construct_proof(
-    data: &[Field],
+fn construct_proof<F: FieldElement>(
+    data: &[F],
     dimension: usize,
-    f0: &mut Field,
-    g0: &mut Field,
-    h0: &mut Field,
-    points_h_packed: &mut [Field],
-    mem: &mut Client,
+    f0: &mut F,
+    g0: &mut F,
+    h0: &mut F,
+    points_h_packed: &mut [F],
+    mem: &mut Client<F>,
 ) {
     let n = (dimension + 1).next_power_of_two();
 
     // set zero terms to random
-    *f0 = Field::from(rand::random::<u32>());
-    *g0 = Field::from(rand::random::<u32>());
+    let mut rng = rand::thread_rng();
+    *f0 = F::rand(&mut rng);
+    *g0 = F::rand(&mut rng);
     mem.points_f[0] = *f0;
     mem.points_g[0] = *g0;
 
@@ -152,9 +155,10 @@ fn construct_proof(
 
     // set f_i = data_(i - 1)
     // set g_i = f_i - 1
+    let one = F::root(0).unwrap();
     for i in 0..dimension {
         mem.points_f[i + 1] = data[i];
-        mem.points_g[i + 1] = data[i] - 1.into();
+        mem.points_g[i + 1] = data[i] - one;
     }
 
     // interpolate and evaluate at roots of unity
@@ -174,6 +178,8 @@ fn construct_proof(
 
 #[test]
 fn test_encode() {
+    use crate::finite_field::Field;
+
     let pub_key1 = PublicKey::from_base64(
         "BIl6j+J6dYttxALdjISDv6ZI4/VWVEhUzaS05LgrsfswmbLOgNt9HUC2E0w+9RqZx3XMkdEHBHfNuCSMpOwofVQ=",
     )
