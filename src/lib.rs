@@ -15,6 +15,7 @@ pub mod encrypt;
 mod fft;
 pub mod field;
 mod fp;
+pub mod pcp; // TODO(cjpatton) Maybe don't make this public.
 mod polynomial;
 mod prng;
 pub mod server;
