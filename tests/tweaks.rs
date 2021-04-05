@@ -57,7 +57,7 @@ fn tweaks(tweak: Tweak) {
     let (share1_original, share2) = client_mem.encode_simple(&data).unwrap();
 
     let decrypted_share1 = decrypt_share(&share1_original, &priv_key1_clone).unwrap();
-    let mut share1_field = deserialize(&decrypted_share1).unwrap();
+    let mut share1_field: Vec<Field> = deserialize(&decrypted_share1).unwrap();
     let unpacked_share1 = unpack_proof_mut(&mut share1_field, dim).unwrap();
 
     let one = Field::from(1);

@@ -7,7 +7,6 @@ use aes_ctr::stream_cipher::NewStreamCipher;
 use aes_ctr::stream_cipher::SyncStreamCipher;
 use aes_ctr::Aes128Ctr;
 use rand::RngCore;
-use std::convert::TryInto;
 
 const BLOCK_SIZE: usize = 16;
 const MAXIMUM_BUFFER_SIZE_IN_BLOCKS: usize = 4096;

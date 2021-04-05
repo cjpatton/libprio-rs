@@ -3,12 +3,7 @@
 
 //! Utility functions for handling Prio stuff.
 
-use crate::finite_field::{Field, FieldElement, FiniteFieldError};
-
-/// Convenience function for initializing fixed sized vectors of Field elements.
-pub fn vector_with_length(len: usize) -> Vec<Field> {
-    vec![Field::from(0); len]
-}
+use crate::finite_field::{FieldElement, FiniteFieldError};
 
 /// Returns the number of field elements in the proof for given dimension of
 /// data elements
@@ -21,36 +16,41 @@ pub fn proof_length(dimension: usize) -> usize {
     dimension + 3 + (dimension + 1).next_power_of_two()
 }
 
+/// Convenience function for initializing fixed sized vectors of Field elements.
+pub fn vector_with_length<F: FieldElement>(len: usize) -> Vec<F> {
+    vec![F::zero(); len]
+}
+
 /// Unpacked proof with subcomponents
-pub struct UnpackedProof<'a> {
+pub struct UnpackedProof<'a, F: FieldElement> {
     /// Data
-    pub data: &'a [Field],
+    pub data: &'a [F],
     /// Zeroth coefficient of polynomial f
-    pub f0: &'a Field,
+    pub f0: &'a F,
     /// Zeroth coefficient of polynomial g
-    pub g0: &'a Field,
+    pub g0: &'a F,
     /// Zeroth coefficient of polynomial h
-    pub h0: &'a Field,
+    pub h0: &'a F,
     /// Non-zero points of polynomial h
-    pub points_h_packed: &'a [Field],
+    pub points_h_packed: &'a [F],
 }
 
 /// Unpacked proof with mutable subcomponents
-pub struct UnpackedProofMut<'a> {
+pub struct UnpackedProofMut<'a, F: FieldElement> {
     /// Data
-    pub data: &'a mut [Field],
+    pub data: &'a mut [F],
     /// Zeroth coefficient of polynomial f
-    pub f0: &'a mut Field,
+    pub f0: &'a mut F,
     /// Zeroth coefficient of polynomial g
-    pub g0: &'a mut Field,
+    pub g0: &'a mut F,
     /// Zeroth coefficient of polynomial h
-    pub h0: &'a mut Field,
+    pub h0: &'a mut F,
     /// Non-zero points of polynomial h
-    pub points_h_packed: &'a mut [Field],
+    pub points_h_packed: &'a mut [F],
 }
 
 /// Unpacks the proof vector into subcomponents
-pub fn unpack_proof(proof: &[Field], dimension: usize) -> Option<UnpackedProof> {
+pub fn unpack_proof<F: FieldElement>(proof: &[F], dimension: usize) -> Option<UnpackedProof<F>> {
     // check the proof length
     if proof.len() != proof_length(dimension) {
         return None;
@@ -73,7 +73,10 @@ pub fn unpack_proof(proof: &[Field], dimension: usize) -> Option<UnpackedProof> 
 }
 
 /// Unpacks a mutable proof vector into mutable subcomponents
-pub fn unpack_proof_mut(proof: &mut [Field], dimension: usize) -> Option<UnpackedProofMut> {
+pub fn unpack_proof_mut<F: FieldElement>(
+    proof: &mut [F],
+    dimension: usize,
+) -> Option<UnpackedProofMut<F>> {
     // check the share length
     if proof.len() != proof_length(dimension) {
         return None;
@@ -113,15 +116,15 @@ pub fn deserialize<F: FieldElement>(data: &[u8]) -> Result<Vec<F>, FiniteFieldEr
     Ok(vec)
 }
 
-/// Add two Field element arrays together elementwise.
+/// Add two field element arrays together elementwise.
 ///
 /// Returns None, when array lengths are not equal.
-pub fn reconstruct_shares(share1: &[Field], share2: &[Field]) -> Option<Vec<Field>> {
+pub fn reconstruct_shares<F: FieldElement>(share1: &[F], share2: &[F]) -> Option<Vec<F>> {
     if share1.len() != share2.len() {
         return None;
     }
 
-    let mut reconstructed = vector_with_length(share1.len());
+    let mut reconstructed = vec![F::zero(); share1.len()];
 
     for (r, (s1, s2)) in reconstructed
         .iter_mut()
@@ -136,12 +139,13 @@ pub fn reconstruct_shares(share1: &[Field], share2: &[Field]) -> Option<Vec<Fiel
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::finite_field::Field;
 
     pub fn secret_share(share: &mut [Field]) -> Vec<Field> {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         let mut random = vec![0u32; share.len()];
-        let mut share2 = vector_with_length(share.len());
+        let mut share2 = vec![Field::zero(); share.len()];
 
         rng.fill(&mut random[..]);
 
@@ -169,7 +173,7 @@ pub mod tests {
 
     #[test]
     fn secret_sharing() {
-        let mut share1 = vector_with_length(10);
+        let mut share1 = vec![Field::zero(); 10];
         share1[3] = 21.into();
         share1[8] = 123.into();
 
