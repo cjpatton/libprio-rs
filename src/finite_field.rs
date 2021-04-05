@@ -336,9 +336,9 @@ make_field!(
 /// # Errors
 ///
 /// Fails if the two vectors do not have the same length.
-pub fn merge_vector(
-    accumulator: &mut [Field],
-    other_vector: &[Field],
+pub fn merge_vector<F: FieldElement>(
+    accumulator: &mut [F],
+    other_vector: &[F],
 ) -> Result<(), FiniteFieldError> {
     if accumulator.len() != other_vector.len() {
         return Err(FiniteFieldError::InputSizeMismatch);

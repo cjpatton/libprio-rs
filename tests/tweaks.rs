@@ -42,8 +42,8 @@ fn tweaks(tweak: Tweak) {
     let priv_key1_clone = priv_key1.clone();
     let pub_key1_clone = pub_key1.clone();
 
-    let mut server1 = Server::new(dim, true, priv_key1);
-    let mut server2 = Server::new(dim, false, priv_key2);
+    let mut server1: Server<Field> = Server::new(dim, true, priv_key1);
+    let mut server2: Server<Field> = Server::new(dim, false, priv_key2);
 
     let mut client_mem = Client::new(dim, pub_key1, pub_key2).unwrap();
 

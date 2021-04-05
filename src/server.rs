@@ -5,7 +5,7 @@
 
 use crate::{
     encrypt::{decrypt_share, EncryptError, PrivateKey},
-    finite_field::{merge_vector, Field, FiniteFieldError},
+    finite_field::{merge_vector, FieldElement, FiniteFieldError},
     polynomial::{poly_interpret_eval, PolyAuxMemory},
     prng::extract_share_from_seed,
     util::{deserialize, proof_length, unpack_proof, vector_with_length},
@@ -25,14 +25,14 @@ pub enum ServerError {
 /// Auxiliary memory for constructing a
 /// [`VerificationMessage`](struct.VerificationMessage.html)
 #[derive(Debug)]
-pub struct ValidationMemory {
-    points_f: Vec<Field>,
-    points_g: Vec<Field>,
-    points_h: Vec<Field>,
-    poly_mem: PolyAuxMemory<Field>,
+pub struct ValidationMemory<F: FieldElement> {
+    points_f: Vec<F>,
+    points_g: Vec<F>,
+    points_h: Vec<F>,
+    poly_mem: PolyAuxMemory<F>,
 }
 
-impl ValidationMemory {
+impl<F: FieldElement> ValidationMemory<F> {
     /// Construct a new ValidationMemory object for validating proof shares of
     /// length `dimension`.
     pub fn new(dimension: usize) -> Self {
@@ -48,22 +48,22 @@ impl ValidationMemory {
 
 /// Main workhorse of the server.
 #[derive(Debug)]
-pub struct Server {
+pub struct Server<F: FieldElement> {
     dimension: usize,
     is_first_server: bool,
-    accumulator: Vec<Field>,
-    validation_mem: ValidationMemory,
+    accumulator: Vec<F>,
+    validation_mem: ValidationMemory<F>,
     private_key: PrivateKey,
 }
 
-impl Server {
+impl<F: FieldElement> Server<F> {
     /// Construct a new server instance
     ///
     /// Params:
     ///  * `dimension`: the number of elements in the aggregation vector.
     ///  * `is_first_server`: only one of the servers should have this true.
     ///  * `private_key`: the private key for decrypting the share of the proof.
-    pub fn new(dimension: usize, is_first_server: bool, private_key: PrivateKey) -> Server {
+    pub fn new(dimension: usize, is_first_server: bool, private_key: PrivateKey) -> Server<F> {
         Server {
             dimension,
             is_first_server,
@@ -74,7 +74,7 @@ impl Server {
     }
 
     /// Decrypt and deserialize
-    fn deserialize_share(&self, encrypted_share: &[u8]) -> Result<Vec<Field>, ServerError> {
+    fn deserialize_share(&self, encrypted_share: &[u8]) -> Result<Vec<F>, ServerError> {
         let share = decrypt_share(encrypted_share, &self.private_key)?;
         Ok(if self.is_first_server {
             deserialize(&share)?
@@ -92,9 +92,9 @@ impl Server {
     /// [choose_eval_at](#method.choose_eval_at).
     pub fn generate_verification_message(
         &mut self,
-        eval_at: Field,
+        eval_at: F,
         share: &[u8],
-    ) -> Option<VerificationMessage> {
+    ) -> Option<VerificationMessage<F>> {
         let share_field = self.deserialize_share(share).ok()?;
         generate_verification_message(
             self.dimension,
@@ -112,8 +112,8 @@ impl Server {
     pub fn aggregate(
         &mut self,
         share: &[u8],
-        v1: &VerificationMessage,
-        v2: &VerificationMessage,
+        v1: &VerificationMessage<F>,
+        v2: &VerificationMessage<F>,
     ) -> Result<bool, ServerError> {
         let share_field = self.deserialize_share(share)?;
         let is_valid = is_valid_share(v1, v2);
@@ -131,7 +131,7 @@ impl Server {
     ///
     /// These can be merged together using
     /// [`reconstruct_shares`](../util/fn.reconstruct_shares.html).
-    pub fn total_shares(&self) -> &[Field] {
+    pub fn total_shares(&self) -> &[F] {
         &self.accumulator
     }
 
@@ -143,7 +143,7 @@ impl Server {
     ///
     /// Returns an error if `other_total_shares.len()` is not equal to this
     //// server's `dimension`.
-    pub fn merge_total_shares(&mut self, other_total_shares: &[Field]) -> Result<(), ServerError> {
+    pub fn merge_total_shares(&mut self, other_total_shares: &[F]) -> Result<(), ServerError> {
         Ok(merge_vector(&mut self.accumulator, other_total_shares)?)
     }
 
@@ -151,9 +151,10 @@ impl Server {
     ///
     /// The point returned is not one of the roots used for polynomial
     /// evaluation.
-    pub fn choose_eval_at(&self) -> Field {
+    pub fn choose_eval_at(&self) -> F {
+        let mut rng = rand::thread_rng();
         loop {
-            let eval_at = Field::from(rand::random::<u32>());
+            let eval_at = F::rand(&mut rng);
             if !self.validation_mem.poly_mem.roots_2n.contains(&eval_at) {
                 break eval_at;
             }
@@ -162,24 +163,24 @@ impl Server {
 }
 
 /// Verification message for proof validation
-pub struct VerificationMessage {
+pub struct VerificationMessage<F: FieldElement> {
     /// f evaluated at random point
-    pub f_r: Field,
+    pub f_r: F,
     /// g evaluated at random point
-    pub g_r: Field,
+    pub g_r: F,
     /// h evaluated at random point
-    pub h_r: Field,
+    pub h_r: F,
 }
 
 /// Given a proof and evaluation point, this constructs the verification
 /// message.
-pub fn generate_verification_message(
+pub fn generate_verification_message<F: FieldElement>(
     dimension: usize,
-    eval_at: Field,
-    proof: &[Field],
+    eval_at: F,
+    proof: &[F],
     is_first_server: bool,
-    mem: &mut ValidationMemory,
-) -> Option<VerificationMessage> {
+    mem: &mut ValidationMemory<F>,
+) -> Option<VerificationMessage<F>> {
     let unpacked = unpack_proof(proof, dimension)?;
     let proof_length = 2 * (dimension + 1).next_power_of_two();
 
@@ -189,12 +190,13 @@ pub fn generate_verification_message(
     mem.points_h[0] = *unpacked.h0;
 
     // set points_f and points_g
+    let one = F::root(0).unwrap();
     for (i, x) in unpacked.data.iter().enumerate() {
         mem.points_f[i + 1] = *x;
 
         if is_first_server {
             // only one server needs to subtract one for point_g
-            mem.points_g[i + 1] = *x - 1.into();
+            mem.points_g[i + 1] = *x - one;
         } else {
             mem.points_g[i + 1] = *x;
         }
@@ -237,7 +239,10 @@ pub fn generate_verification_message(
 }
 
 /// Decides if the distributed proof is valid
-pub fn is_valid_share(v1: &VerificationMessage, v2: &VerificationMessage) -> bool {
+pub fn is_valid_share<F: FieldElement>(
+    v1: &VerificationMessage<F>,
+    v2: &VerificationMessage<F>,
+) -> bool {
     // reconstruct f_r, g_r, h_r
     let f_r = v1.f_r + v2.f_r;
     let g_r = v1.g_r + v2.g_r;
@@ -249,6 +254,7 @@ pub fn is_valid_share(v1: &VerificationMessage, v2: &VerificationMessage) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::finite_field::Field;
     use crate::util;
 
     #[test]
