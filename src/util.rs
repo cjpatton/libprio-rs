@@ -139,18 +139,18 @@ pub fn reconstruct_shares<F: FieldElement>(share1: &[F], share2: &[F]) -> Option
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::finite_field::Field;
+    use crate::finite_field::Field32;
 
-    pub fn secret_share(share: &mut [Field]) -> Vec<Field> {
+    pub fn secret_share(share: &mut [Field32]) -> Vec<Field32> {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         let mut random = vec![0u32; share.len()];
-        let mut share2 = vec![Field::zero(); share.len()];
+        let mut share2 = vec![Field32::zero(); share.len()];
 
         rng.fill(&mut random[..]);
 
         for (r, f) in random.iter().zip(share2.iter_mut()) {
-            *f = Field::from(*r);
+            *f = Field32::from(*r);
         }
 
         for (f1, f2) in share.iter_mut().zip(share2.iter()) {
@@ -165,15 +165,15 @@ pub mod tests {
         let dim = 15;
         let len = proof_length(dim);
 
-        let mut share = vec![Field::from(0); len];
+        let mut share = vec![Field32::from(0); len];
         let unpacked = unpack_proof_mut(&mut share, dim).unwrap();
-        *unpacked.f0 = Field::from(12);
+        *unpacked.f0 = Field32::from(12);
         assert_eq!(share[dim], 12);
     }
 
     #[test]
     fn secret_sharing() {
-        let mut share1 = vec![Field::zero(); 10];
+        let mut share1 = vec![Field32::zero(); 10];
         share1[3] = 21.into();
         share1[8] = 123.into();
 
@@ -187,9 +187,9 @@ pub mod tests {
 
     #[test]
     fn serialization() {
-        let field = [Field::from(1), Field::from(0x99997)];
+        let field = [Field32::from(1), Field32::from(0x99997)];
         let bytes = serialize(&field);
-        let field_deserialized = deserialize::<Field>(&bytes).unwrap();
+        let field_deserialized = deserialize::<Field32>(&bytes).unwrap();
         assert_eq!(field_deserialized, field);
     }
 }

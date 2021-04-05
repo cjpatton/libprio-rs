@@ -298,10 +298,9 @@ macro_rules! make_field {
     };
 }
 
-// TODO(cjpatton) Rename this to Field32.
 make_field!(
     /// `GF(4293918721)`, a 32-bit field. The generator has order `2^20`.
-    Field,
+    Field32,
     u32,
     FP32,
     4
@@ -360,14 +359,14 @@ mod tests {
     #[test]
     fn test_accumulate() {
         let mut lhs = vector_with_length(10);
-        lhs.iter_mut().for_each(|f| *f = Field(1));
+        lhs.iter_mut().for_each(|f| *f = Field32(1));
         let mut rhs = vector_with_length(10);
-        rhs.iter_mut().for_each(|f| *f = Field(2));
+        rhs.iter_mut().for_each(|f| *f = Field32(2));
 
         merge_vector(&mut lhs, &rhs).unwrap();
 
-        lhs.iter().for_each(|f| assert_eq!(*f, Field(3)));
-        rhs.iter().for_each(|f| assert_eq!(*f, Field(2)));
+        lhs.iter().for_each(|f| assert_eq!(*f, Field32(3)));
+        rhs.iter().for_each(|f| assert_eq!(*f, Field32(2)));
 
         let wrong_len = vector_with_length(9);
         let result = merge_vector(&mut lhs, &wrong_len);
@@ -459,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_field32() {
-        field_element_test::<Field>();
+        field_element_test::<Field32>();
     }
 
     #[test]

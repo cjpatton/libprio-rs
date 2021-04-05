@@ -188,11 +188,11 @@ pub fn poly_interpret_eval<F: FieldElement>(
 
 #[test]
 fn test_roots() {
-    use crate::finite_field::Field;
+    use crate::finite_field::Field32;
 
     let count = 128;
-    let roots = fft_get_roots::<Field>(count, false);
-    let roots_inv = fft_get_roots::<Field>(count, true);
+    let roots = fft_get_roots::<Field32>(count, false);
+    let roots_inv = fft_get_roots::<Field32>(count, true);
 
     for i in 0..count {
         assert_eq!(roots[i] * roots_inv[i], 1);
@@ -203,9 +203,9 @@ fn test_roots() {
 
 #[test]
 fn test_horner_eval() {
-    use crate::finite_field::Field;
+    use crate::finite_field::Field32;
 
-    let mut poly = vec![Field::from(0); 4];
+    let mut poly = vec![Field32::from(0); 4];
     poly[0] = 2.into();
     poly[1] = 1.into();
     poly[2] = 5.into();
@@ -218,7 +218,7 @@ fn test_horner_eval() {
 
 #[test]
 fn test_fft() {
-    use crate::finite_field::Field;
+    use crate::finite_field::Field32;
 
     use rand::prelude::*;
     use std::convert::TryFrom;
@@ -226,13 +226,13 @@ fn test_fft() {
     let count = 128;
     let mut mem = PolyAuxMemory::new(count / 2);
 
-    let mut poly = vec![Field::from(0); count];
-    let mut points2 = vec![Field::from(0); count];
+    let mut poly = vec![Field32::from(0); count];
+    let mut points2 = vec![Field32::from(0); count];
 
     let points = (0..count)
         .into_iter()
-        .map(|_| Field::from(random::<u32>()))
-        .collect::<Vec<Field>>();
+        .map(|_| Field32::from(random::<u32>()))
+        .collect::<Vec<Field32>>();
 
     // From points to coeffs and back
     poly_fft(
@@ -264,7 +264,7 @@ fn test_fft() {
         &mut mem.fft_memory,
     );
     for i in 0..count {
-        let mut should_be = Field::from(0);
+        let mut should_be = Field32::from(0);
         for j in 0..count {
             should_be = mem.roots_2n[i].pow(u32::try_from(j).unwrap()) * points[j] + should_be;
         }

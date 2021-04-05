@@ -82,11 +82,11 @@ fn random_field_from_seed<F: FieldElement>(seed: &[u8], length: usize) -> Vec<F>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finite_field::Field;
+    use crate::finite_field::Field32;
 
     #[test]
     fn secret_sharing() {
-        let mut data = vec![Field::from(0); 123];
+        let mut data = vec![Field32::from(0); 123];
         data[3] = 23.into();
 
         let data_clone = data.clone();
@@ -122,7 +122,7 @@ mod tests {
             0xacb8b748, 0x6f5b9d49, 0x887d061b, 0x86db0c58,
         ];
 
-        let share2 = extract_share_from_seed::<Field>(reference.len(), &seed);
+        let share2 = extract_share_from_seed::<Field32>(reference.len(), &seed);
 
         assert_eq!(share2, reference);
     }
@@ -130,7 +130,7 @@ mod tests {
     /// takes a seed and hash as base64 encoded strings
     fn random_data_interop(seed_base64: &str, hash_base64: &str, len: usize) {
         let seed = base64::decode(seed_base64).unwrap();
-        let random_data = extract_share_from_seed::<Field>(len, &seed);
+        let random_data = extract_share_from_seed::<Field32>(len, &seed);
 
         let random_bytes = crate::util::serialize(&random_data);
 

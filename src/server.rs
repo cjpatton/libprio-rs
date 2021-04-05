@@ -254,7 +254,7 @@ pub fn is_valid_share<F: FieldElement>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finite_field::Field;
+    use crate::finite_field::Field32;
     use crate::util;
 
     #[test]
@@ -266,9 +266,9 @@ mod tests {
             2567182742, 3542857140, 124017604, 4201373647, 431621210, 1618555683, 267689149,
         ];
 
-        let mut proof: Vec<Field> = proof_u32.iter().map(|x| Field::from(*x)).collect();
+        let mut proof: Vec<Field32> = proof_u32.iter().map(|x| Field32::from(*x)).collect();
         let share2 = util::tests::secret_share(&mut proof);
-        let eval_at = Field::from(12313);
+        let eval_at = Field32::from(12313);
 
         let mut validation_mem = ValidationMemory::new(dim);
 
