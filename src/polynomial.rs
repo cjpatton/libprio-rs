@@ -164,10 +164,14 @@ pub fn poly_fft<F: FieldElement>(
     fft_interpolate_raw(points_out, points_in, n_points, scaled_roots, invert, mem)
 }
 
-pub fn poly_horner_eval<F: FieldElement>(poly: &[F], eval_at: F, len: usize) -> F {
-    let mut result = poly[len - 1];
+// Evaluate a polynomial using Horner's method.
+pub fn poly_eval<F: FieldElement>(poly: &[F], eval_at: F) -> F {
+    if poly.len() == 0 {
+        return F::zero();
+    }
 
-    for i in (0..(len - 1)).rev() {
+    let mut result = poly[poly.len() - 1];
+    for i in (0..poly.len() - 1).rev() {
         result *= eval_at;
         result += poly[i];
     }
@@ -183,7 +187,7 @@ pub fn poly_interpret_eval<F: FieldElement>(
     fft_memory: &mut PolyFFTTempMemory<F>,
 ) -> F {
     poly_fft(tmp_coeffs, points, roots, points.len(), true, fft_memory);
-    poly_horner_eval(&tmp_coeffs, eval_at, points.len())
+    poly_eval(&tmp_coeffs[..points.len()], eval_at)
 }
 
 #[test]
@@ -210,10 +214,10 @@ fn test_horner_eval() {
     poly[1] = 1.into();
     poly[2] = 5.into();
     // 5*3^2 + 3 + 2 = 50
-    assert_eq!(poly_horner_eval(&poly, 3.into(), 3), 50);
+    assert_eq!(poly_eval(&poly[..3], 3.into()), 50);
     poly[3] = 4.into();
     // 4*3^3 + 5*3^2 + 3 + 2 = 158
-    assert_eq!(poly_horner_eval(&poly, 3.into(), 4), 158);
+    assert_eq!(poly_eval(&poly[..4], 3.into()), 158);
 }
 
 #[test]

@@ -23,7 +23,25 @@
 
 use std::marker::PhantomData;
 
+use crate::fft::FftError;
 use crate::field::FieldElement;
+
+/// Possible errors from finite field operations.
+#[derive(Debug, thiserror::Error)]
+pub enum PcpError {
+    /// The the caller of an arithmetic circuite provided the wrong number of inputs.
+    #[error("wrong number of inputs to arithmetic circuit")]
+    CircuitInLen,
+    /// XXX
+    #[error("XXX")]
+    CircuitInDeg,
+    /// XXX
+    #[error("XXX")]
+    CircuitOutDeg,
+    /// XXX
+    #[error("FFT error")]
+    Fft(#[from] FftError),
+}
 
 /// This type represents an input to be validated.
 pub trait Datum<F: FieldElement, G: Gadget<F>>: Sized {
@@ -46,11 +64,20 @@ pub trait Datum<F: FieldElement, G: Gadget<F>>: Sized {
 /// The sub-circuit associated with some validity circuit.
 pub trait Gadget<F: FieldElement> {
     /// Evaluates the gadget on input `inp` and returns the output.
-    fn call(&self, inp: &[F]) -> F;
+    fn call(&mut self, inp: &[F]) -> Result<F, PcpError>;
+
+    /// XXX
+    fn call_in_len(&self) -> usize;
+
+    /// Evaluate the gaget on input of a sequence of polynomials `inp` over `F`.
+    fn call_poly<V: AsRef<[F]>>(&mut self, outp: &mut [F], inp: &[V]) -> Result<(), PcpError>;
+
+    /// XXX
+    fn call_poly_out_deg(&self, in_deg: usize) -> usize;
 }
 
 /// Generate a PCP of the validity of `x`'. This is algorithm is run by the prover.
-pub fn prove<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(x: &T) -> Proof<F> {
+pub fn prove<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(_x: &T) -> Proof<F> {
     // XXX
     panic!("TODO");
 }
@@ -65,9 +92,9 @@ pub struct Proof<F: FieldElement> {
 /// algorithm is run by the verifier. In Prio, each aggregator runs this algorithm on a share of
 /// the proof and input.
 pub fn query<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(
-    x: &T,
-    pf: &Proof<F>,
-    rand: &[F],
+    _x: &T,
+    _pf: &Proof<F>,
+    _rand: &[F],
 ) -> Verifier<F> {
     // XXX
     panic!("TODO");
@@ -82,7 +109,131 @@ pub struct Verifier<F: FieldElement> {
 /// Decide if input `x` is valid based on verification message `vf`. This algorithm is run by the
 /// verifier. IN prio, this algorithm is run by the leader and the output is distributed among the
 /// rest of the aggregators.
-pub fn decide<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(x: &T, vf: &Verifier<F>) -> bool {
+pub fn decide<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(_x: &T, _vf: &Verifier<F>) -> bool {
     // XXX
     panic!("TODO");
+}
+
+pub mod gadget {
+    //! A collection of gadgets.
+    use super::*;
+    use crate::fft::{discrete_fourier_transform, discrete_fourier_transform_inv};
+
+    /// An arity-2 gadget that multiples the inputs.
+    pub struct MulGadget<F: FieldElement> {
+        phantom: PhantomData<F>,
+    }
+
+    impl<F: FieldElement> MulGadget<F> {
+        /// XXX
+        pub fn new() -> Self {
+            Self {
+                phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<F: FieldElement> Gadget<F> for MulGadget<F> {
+        fn call(&mut self, inp: &[F]) -> Result<F, PcpError> {
+            gadget_call_check(self, inp)?;
+            Ok(inp[0] * inp[1])
+        }
+
+        fn call_in_len(&self) -> usize {
+            2
+        }
+
+        fn call_poly<V: AsRef<[F]>>(&mut self, outp: &mut [F], inp: &[V]) -> Result<(), PcpError> {
+            gadget_call_poly_check(self, outp, inp)?;
+            let n = 2 * inp[0].as_ref().len();
+            let mut buf = vec![F::zero(); n];
+
+            discrete_fourier_transform(&mut buf, inp[0].as_ref(), n)?;
+            discrete_fourier_transform(outp, inp[1].as_ref(), n)?;
+
+            for i in 0..n {
+                buf[i] *= outp[i];
+            }
+
+            discrete_fourier_transform_inv(outp, &buf, n)?;
+            Ok(())
+        }
+
+        fn call_poly_out_deg(&self, in_deg: usize) -> usize {
+            2 * in_deg
+        }
+    }
+
+    // Check that the input parameters of g.call() are wll-formed.
+    fn gadget_call_check<F: FieldElement, G: Gadget<F>>(g: &G, inp: &[F]) -> Result<(), PcpError> {
+        if inp.len() != g.call_in_len() {
+            return Err(PcpError::CircuitInLen);
+        }
+
+        Ok(())
+    }
+
+    // Check that the input parameters of g.call_poly() are well-formed.
+    fn gadget_call_poly_check<F: FieldElement, G: Gadget<F>, V: AsRef<[F]>>(
+        g: &G,
+        outp: &[F],
+        inp: &[V],
+    ) -> Result<(), PcpError> {
+        if inp.len() != g.call_in_len() {
+            return Err(PcpError::CircuitInLen);
+        }
+
+        if inp.len() == 0 {
+            return Ok(());
+        }
+
+        for i in 1..inp.len() {
+            if inp[i].as_ref().len() != inp[0].as_ref().len() {
+                return Err(PcpError::CircuitInDeg);
+            }
+        }
+
+        if outp.len() < g.call_poly_out_deg(inp[0].as_ref().len()) {
+            return Err(PcpError::CircuitOutDeg);
+        }
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        use crate::field::Field80 as TestField;
+        use crate::polynomial::poly_eval;
+
+        // Test that calling g.call_poly() and evaluating the output at a given point is equivalent
+        // to evaluating each of the inputs at the same point and aplying g.call() on the results.
+        fn gadget_test<F: FieldElement, G: Gadget<F>>(g: &mut G) {
+            let poly_in_deg = 128;
+            let mut rng = rand::thread_rng();
+            let mut inp = vec![F::zero(); g.call_in_len()];
+            let mut poly_outp = vec![F::zero(); g.call_poly_out_deg(poly_in_deg)];
+            let mut poly_inp = vec![vec![F::zero(); poly_in_deg]; g.call_in_len()];
+
+            let r = F::rand(&mut rng);
+            for i in 0..g.call_in_len() {
+                for j in 0..poly_in_deg {
+                    poly_inp[i][j] = F::rand(&mut rng);
+                }
+                inp[i] = poly_eval(&poly_inp[i], r);
+            }
+
+            g.call_poly(&mut poly_outp, &poly_inp).unwrap();
+            let got = poly_eval(&poly_outp, r);
+            let want = g.call(&inp).unwrap();
+            assert_eq!(got, want);
+        }
+
+        #[test]
+        fn test_mul_gadget() {
+            let mut g: MulGadget<TestField> = MulGadget::new();
+            gadget_test(&mut g);
+        }
+    }
 }
