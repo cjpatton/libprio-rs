@@ -132,6 +132,7 @@ pub fn decide<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(_x: &T, _vf: &Verif
 
 pub mod datum {
     //! A collection of data types.
+    use super::gadget::MulGadget;
     use super::*;
 
     /// XXX
@@ -149,7 +150,27 @@ pub mod datum {
         }
     }
 
-    // XXX
+    impl<F: FieldElement> Datum<F, MulGadget<F>> for Bool<F> {
+        fn valid(&self, g: &mut dyn Gadget<F>, rand: &[F]) -> F {
+            panic!("TODO");
+        }
+
+        fn gadget(&self) -> MulGadget<F> {
+            panic!("TODO");
+        }
+
+        fn gadget_call_ct(&self) -> usize {
+            panic!("TODO");
+        }
+
+        fn vec(&self) -> &[F] {
+            panic!("TODO");
+        }
+
+        fn from_vec(vec: &[F]) -> Option<Self> {
+            panic!("TODO");
+        }
+    }
 }
 
 pub mod gadget {
