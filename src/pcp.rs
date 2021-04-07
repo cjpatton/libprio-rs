@@ -25,6 +25,7 @@ use std::marker::PhantomData;
 
 use crate::fft::FftError;
 use crate::field::FieldElement;
+use crate::fp::log2;
 
 /// Possible errors from finite field operations.
 #[derive(Debug, thiserror::Error)]
@@ -47,11 +48,16 @@ pub enum PcpError {
 pub trait Datum<F: FieldElement, G: Gadget<F>>: Sized {
     /// Evalauates the arithmetic circuit on the given input (i.e., `self`) and returns the output.
     /// `rand` is the random input of the validity circuit.
-    fn valid(&self, rand: &[F]) -> F;
+    fn valid(&self, g: &mut dyn Gadget<F>, rand: &[F]) -> F;
 
     /// Returns an instance of gadget associated with the validity circuit. The length of the proof
     /// generated for this data type is linear in the number of times the gadget is invoked.
-    fn gadget(&self) -> G;
+    fn gadget(&self) -> G
+    where
+        G: GadgetWithCallPoly<F>;
+
+    /// XXX
+    fn gadget_call_ct(&self) -> usize;
 
     /// Returns a reference to the input encoded as a vector of field elements.
     fn vec(&self) -> &[F];
@@ -68,7 +74,10 @@ pub trait Gadget<F: FieldElement> {
 
     /// XXX
     fn call_in_len(&self) -> usize;
+}
 
+/// XXX
+pub trait GadgetWithCallPoly<F: FieldElement> {
     /// Evaluate the gaget on input of a sequence of polynomials `inp` over `F`.
     fn call_poly<V: AsRef<[F]>>(&mut self, outp: &mut [F], inp: &[V]) -> Result<(), PcpError>;
 
@@ -77,15 +86,22 @@ pub trait Gadget<F: FieldElement> {
 }
 
 /// Generate a PCP of the validity of `x`'. This is algorithm is run by the prover.
-pub fn prove<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(_x: &T) -> Proof<F> {
-    // XXX
+pub fn prove<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(x: &T) -> Proof<F>
+where
+    G: GadgetWithCallPoly<F>,
+{
+    let g = x.gadget();
+    let m = 1 << log2(x.gadget_call_ct() as u128 + 1);
+    let l = g.call_in_len();
     panic!("TODO");
 }
 
 /// The output of `prove`.
 pub struct Proof<F: FieldElement> {
-    // XXX
-    phantom: PhantomData<F>,
+    /// The first coefficient of each intermediate proof polynomial.
+    pub f0: Vec<F>,
+    /// The proof polynomial.
+    pub p: Vec<F>,
 }
 
 /// Generate the verification message for input `x` and proof `pf`, and randomness `rand`. This
@@ -120,16 +136,12 @@ pub mod gadget {
     use crate::fft::{discrete_fourier_transform, discrete_fourier_transform_inv};
 
     /// An arity-2 gadget that multiples the inputs.
-    pub struct MulGadget<F: FieldElement> {
-        phantom: PhantomData<F>,
-    }
+    pub struct MulGadget<F: FieldElement>(PhantomData<F>);
 
     impl<F: FieldElement> MulGadget<F> {
         /// XXX
         pub fn new() -> Self {
-            Self {
-                phantom: PhantomData,
-            }
+            Self(PhantomData)
         }
     }
 
@@ -142,7 +154,9 @@ pub mod gadget {
         fn call_in_len(&self) -> usize {
             2
         }
+    }
 
+    impl<F: FieldElement> GadgetWithCallPoly<F> for MulGadget<F> {
         fn call_poly<V: AsRef<[F]>>(&mut self, outp: &mut [F], inp: &[V]) -> Result<(), PcpError> {
             gadget_call_poly_check(self, outp, inp)?;
             let n = 2 * inp[0].as_ref().len();
@@ -178,7 +192,10 @@ pub mod gadget {
         g: &G,
         outp: &[F],
         inp: &[V],
-    ) -> Result<(), PcpError> {
+    ) -> Result<(), PcpError>
+    where
+        G: GadgetWithCallPoly<F>,
+    {
         if inp.len() != g.call_in_len() {
             return Err(PcpError::CircuitInLen);
         }
@@ -209,7 +226,10 @@ pub mod gadget {
 
         // Test that calling g.call_poly() and evaluating the output at a given point is equivalent
         // to evaluating each of the inputs at the same point and aplying g.call() on the results.
-        fn gadget_test<F: FieldElement, G: Gadget<F>>(g: &mut G) {
+        fn gadget_test<F: FieldElement, G: Gadget<F>>(g: &mut G)
+        where
+            G: GadgetWithCallPoly<F>,
+        {
             let poly_in_deg = 128;
             let mut rng = rand::thread_rng();
             let mut inp = vec![F::zero(); g.call_in_len()];
