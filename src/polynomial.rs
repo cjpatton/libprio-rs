@@ -179,6 +179,18 @@ pub fn poly_eval<F: FieldElement>(poly: &[F], eval_at: F) -> F {
     result
 }
 
+pub fn poly_deg<F: FieldElement>(p: &[F]) -> usize {
+    let mut d = p.len();
+    while d > 0 && p[d - 1] == F::zero() {
+        d -= 1;
+    }
+    d.saturating_sub(1)
+}
+
+pub fn poly_mul<F: FieldElement>(p: &[F], q: &[F]) -> Vec<F> {
+    panic!("TODO");
+}
+
 pub fn poly_interpret_eval<F: FieldElement>(
     points: &[F],
     roots: &[F],
@@ -206,7 +218,7 @@ fn test_roots() {
 }
 
 #[test]
-fn test_horner_eval() {
+fn test_eval() {
     use crate::field::Field32;
 
     let mut poly = vec![Field32::from(0); 4];
@@ -218,6 +230,29 @@ fn test_horner_eval() {
     poly[3] = 4.into();
     // 4*3^3 + 5*3^2 + 3 + 2 = 158
     assert_eq!(poly_eval(&poly[..4], 3.into()), 158);
+}
+
+#[test]
+fn test_poly_deg() {
+    use crate::field::Field32;
+
+    let zero = Field32::zero();
+    let one = Field32::root(0).unwrap();
+    assert_eq!(poly_deg(&vec![zero]), 0);
+    assert_eq!(poly_deg(&vec![one]), 0);
+    assert_eq!(poly_deg(&vec![zero, one]), 1);
+    assert_eq!(poly_deg(&vec![zero, zero, one]), 2);
+    assert_eq!(poly_deg(&vec![zero, one, one]), 2);
+    assert_eq!(poly_deg(&vec![zero, one, one, one]), 3);
+    assert_eq!(poly_deg(&vec![zero, one, one, one, zero]), 3);
+    assert_eq!(poly_deg(&vec![zero, one, one, one, zero, zero]), 3);
+}
+
+#[test]
+fn test_poly_mul() {
+    use crate::field::Field32;
+
+    // XXX
 }
 
 #[test]
