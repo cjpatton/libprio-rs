@@ -21,11 +21,13 @@
 //! are either affine (i.e., addition or scalar multiplication) or invoke a special sub-circuit,
 //! called the gadget, which may contain non-affice operations (i.e., multiplication).
 
+use std::convert::TryFrom;
 use std::marker::PhantomData;
 
 use crate::fft::FftError;
 use crate::field::FieldElement;
 use crate::fp::log2;
+use crate::polynomial::{poly_eval, poly_mul};
 
 /// Possible errors from finite field operations.
 #[derive(Debug, thiserror::Error)]
@@ -170,6 +172,46 @@ pub mod datum {
         fn from_vec(vec: &[F]) -> Option<Self> {
             panic!("TODO");
         }
+    }
+}
+
+// Returns a polynomial `p` for which `p(x) = 0` if in `[start, end)` and `p(x) != 0` otherwise.
+fn poly_range_check<F: FieldElement>(start: usize, end: usize) -> Vec<F> {
+    let mut p = vec![F::one()];
+    let mut q = [F::zero(), F::one()];
+    for i in start..end {
+        q[0] = -F::from(F::Integer::try_from(i).unwrap());
+        p = poly_mul(&p, &q);
+    }
+    p
+}
+
+mod tests {
+    use super::*;
+    use crate::field::Field126;
+
+    #[test]
+    fn test_poly_range_check() {
+        let start = 74;
+        let end = 112;
+        let p = poly_range_check(start, end);
+
+        // Check each number in the range.
+        for i in start..end {
+            let x = Field126::from(i as u128);
+            let y = poly_eval(&p, x);
+            assert_eq!(y, Field126::zero(), "range check failed for {}", i);
+        }
+
+        // Check the number below the range.
+        let x = Field126::from((start - 1) as u128);
+        let y = poly_eval(&p, x);
+        assert_ne!(y, Field126::zero());
+
+        // Check a number above the range.
+        let x = Field126::from(end as u128);
+        let y = poly_eval(&p, x);
+        assert_ne!(y, Field126::zero());
     }
 }
 
