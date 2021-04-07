@@ -179,6 +179,7 @@ pub fn poly_eval<F: FieldElement>(poly: &[F], eval_at: F) -> F {
     result
 }
 
+// Returns the degree of polynomial `p`.
 pub fn poly_deg<F: FieldElement>(p: &[F]) -> usize {
     let mut d = p.len();
     while d > 0 && p[d - 1] == F::zero() {
@@ -187,8 +188,18 @@ pub fn poly_deg<F: FieldElement>(p: &[F]) -> usize {
     d.saturating_sub(1)
 }
 
+// Multiples polynomials `p` and `q` and returns the resulto.
 pub fn poly_mul<F: FieldElement>(p: &[F], q: &[F]) -> Vec<F> {
-    panic!("TODO");
+    let p_size = poly_deg(p) + 1;
+    let q_size = poly_deg(q) + 1;
+    let mut out = vec![F::zero(); p_size + q_size];
+    for i in 0..p.len() {
+        for j in 0..q.len() {
+            out[i + j] += p[i] * q[j];
+        }
+    }
+    out.truncate(poly_deg(&out) + 1);
+    out
 }
 
 pub fn poly_interpret_eval<F: FieldElement>(
@@ -238,21 +249,40 @@ fn test_poly_deg() {
 
     let zero = Field32::zero();
     let one = Field32::root(0).unwrap();
-    assert_eq!(poly_deg(&vec![zero]), 0);
-    assert_eq!(poly_deg(&vec![one]), 0);
-    assert_eq!(poly_deg(&vec![zero, one]), 1);
-    assert_eq!(poly_deg(&vec![zero, zero, one]), 2);
-    assert_eq!(poly_deg(&vec![zero, one, one]), 2);
-    assert_eq!(poly_deg(&vec![zero, one, one, one]), 3);
-    assert_eq!(poly_deg(&vec![zero, one, one, one, zero]), 3);
-    assert_eq!(poly_deg(&vec![zero, one, one, one, zero, zero]), 3);
+    assert_eq!(poly_deg(&[zero]), 0);
+    assert_eq!(poly_deg(&[one]), 0);
+    assert_eq!(poly_deg(&[zero, one]), 1);
+    assert_eq!(poly_deg(&[zero, zero, one]), 2);
+    assert_eq!(poly_deg(&[zero, one, one]), 2);
+    assert_eq!(poly_deg(&[zero, one, one, one]), 3);
+    assert_eq!(poly_deg(&[zero, one, one, one, zero]), 3);
+    assert_eq!(poly_deg(&[zero, one, one, one, zero, zero]), 3);
 }
 
 #[test]
 fn test_poly_mul() {
-    use crate::field::Field32;
+    use crate::field::Field64;
 
-    // XXX
+    let p = [
+        Field64::from(u64::try_from(2).unwrap()),
+        Field64::from(u64::try_from(3).unwrap()),
+    ];
+
+    let q = [
+        Field64::one(),
+        Field64::zero(),
+        Field64::from(u64::try_from(5).unwrap()),
+    ];
+
+    let want = [
+        Field64::from(u64::try_from(2).unwrap()),
+        Field64::from(u64::try_from(3).unwrap()),
+        Field64::from(u64::try_from(10).unwrap()),
+        Field64::from(u64::try_from(15).unwrap()),
+    ];
+
+    let got = poly_mul(&p, &q);
+    assert_eq!(&got, &want);
 }
 
 #[test]

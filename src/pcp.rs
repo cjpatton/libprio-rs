@@ -274,15 +274,14 @@ pub mod gadget {
             G: GadgetWithCallPoly<F>,
         {
             let poly_in_deg = 128;
-            let mut rng = rand::thread_rng();
             let mut inp = vec![F::zero(); g.call_in_len()];
             let mut poly_outp = vec![F::zero(); g.call_poly_out_deg(poly_in_deg)];
             let mut poly_inp = vec![vec![F::zero(); poly_in_deg]; g.call_in_len()];
 
-            let r = F::rand(&mut rng);
+            let r = F::rand();
             for i in 0..g.call_in_len() {
                 for j in 0..poly_in_deg {
-                    poly_inp[i][j] = F::rand(&mut rng);
+                    poly_inp[i][j] = F::rand();
                 }
                 inp[i] = poly_eval(&poly_inp[i], r);
             }
