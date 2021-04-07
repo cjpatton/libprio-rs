@@ -130,6 +130,28 @@ pub fn decide<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(_x: &T, _vf: &Verif
     panic!("TODO");
 }
 
+pub mod datum {
+    //! A collection of data types.
+    use super::*;
+
+    /// XXX
+    pub struct Bool<F: FieldElement> {
+        data: [F; 1],
+    }
+
+    impl<F: FieldElement> Bool<F> {
+        pub fn new(b: bool) -> Self {
+            let val = match b {
+                true => F::root(0).unwrap(),
+                false => F::zero(),
+            };
+            Self { data: [val] }
+        }
+    }
+
+    // XXX
+}
+
 pub mod gadget {
     //! A collection of gadgets.
     use super::*;
