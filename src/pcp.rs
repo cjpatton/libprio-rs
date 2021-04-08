@@ -50,7 +50,11 @@ pub enum PcpError {
 pub trait Datum<F: FieldElement, G: Gadget<F>>: Sized {
     /// Evalauates the arithmetic circuit on the given input (i.e., `self`) and returns the output.
     /// `rand` is the random input of the validity circuit.
-    fn valid(&self, g: &mut dyn Gadget<F>, rand: &[F]) -> F;
+    fn valid(&self, g: &mut dyn Gadget<F>, rand: &[F]) -> Result<F, PcpError>;
+
+    /// Returns `true` if `val` is the value output by the validity circuit when run on valid
+    /// inputs.
+    fn is_valid(v: &F) -> bool;
 
     /// Returns an instance of gadget associated with the validity circuit. The length of the proof
     /// generated for this data type is linear in the number of times the gadget is invoked.
@@ -132,49 +136,6 @@ pub fn decide<F: FieldElement, G: Gadget<F>, T: Datum<F, G>>(_x: &T, _vf: &Verif
     panic!("TODO");
 }
 
-pub mod datum {
-    //! A collection of data types.
-    use super::gadget::MulGadget;
-    use super::*;
-
-    /// XXX
-    pub struct Bool<F: FieldElement> {
-        data: [F; 1],
-    }
-
-    impl<F: FieldElement> Bool<F> {
-        pub fn new(b: bool) -> Self {
-            let val = match b {
-                true => F::root(0).unwrap(),
-                false => F::zero(),
-            };
-            Self { data: [val] }
-        }
-    }
-
-    impl<F: FieldElement> Datum<F, MulGadget<F>> for Bool<F> {
-        fn valid(&self, g: &mut dyn Gadget<F>, rand: &[F]) -> F {
-            panic!("TODO");
-        }
-
-        fn gadget(&self) -> MulGadget<F> {
-            panic!("TODO");
-        }
-
-        fn gadget_call_ct(&self) -> usize {
-            panic!("TODO");
-        }
-
-        fn vec(&self) -> &[F] {
-            panic!("TODO");
-        }
-
-        fn from_vec(vec: &[F]) -> Option<Self> {
-            panic!("TODO");
-        }
-    }
-}
-
 // Returns a polynomial `p` for which `p(x) = 0` if in `[start, end)` and `p(x) != 0` otherwise.
 fn poly_range_check<F: FieldElement>(start: usize, end: usize) -> Vec<F> {
     let mut p = vec![F::one()];
@@ -212,6 +173,87 @@ mod tests {
         let x = Field126::from(end as u128);
         let y = poly_eval(&p, x);
         assert_ne!(y, Field126::zero());
+    }
+}
+
+pub mod datum {
+    //! A collection of data types.
+    use super::gadget::MulGadget;
+    use super::*;
+
+    /// XXX
+    pub struct Bool<F: FieldElement> {
+        val: [F; 1],
+    }
+
+    impl<F: FieldElement> Bool<F> {
+        pub fn new(b: bool) -> Self {
+            Self {
+                val: [match b {
+                    true => F::one(),
+                    false => F::zero(),
+                }],
+            }
+        }
+    }
+
+    impl<F: FieldElement> Datum<F, MulGadget<F>> for Bool<F> {
+        fn valid(&self, g: &mut dyn Gadget<F>, rand: &[F]) -> Result<F, PcpError> {
+            let range = poly_range_check(0, 2);
+            let mut inp = [range[range.len() - 1], self.val[0]];
+
+            // Evaluate the range polynomial on the input using Horner's method.
+            for i in (0..range.len() - 1).rev() {
+                inp[0] = g.call(&inp)?;
+                inp[0] += range[i];
+            }
+
+            Ok(inp[0])
+        }
+
+        fn is_valid(v: &F) -> bool {
+            *v == F::zero()
+        }
+
+        fn gadget(&self) -> MulGadget<F> {
+            MulGadget::new()
+        }
+
+        fn gadget_call_ct(&self) -> usize {
+            panic!("TODO");
+        }
+
+        fn vec(&self) -> &[F] {
+            panic!("TODO");
+        }
+
+        fn from_vec(vec: &[F]) -> Option<Self> {
+            panic!("TODO");
+        }
+    }
+
+    mod tests {
+        use super::*;
+        use crate::field::Field126 as TestField;
+
+        #[test]
+        fn test_bool() {
+            // Test valid input.
+            let x = Bool::<TestField>::new(true);
+            let v = x.valid(&mut x.gadget(), &[]).unwrap();
+            assert_eq!(Bool::is_valid(&v), true, "output: {}", v);
+
+            let x = Bool::<TestField>::new(false);
+            let v = x.valid(&mut x.gadget(), &[]).unwrap();
+            assert_eq!(Bool::is_valid(&v), true, "output: {}", v);
+
+            // Test invalid input.
+            let x = Bool {
+                val: [TestField::rand()],
+            };
+            let v = x.valid(&mut x.gadget(), &[]).unwrap();
+            assert_eq!(Bool::is_valid(&v), false, "output: {}", v);
+        }
     }
 }
 
