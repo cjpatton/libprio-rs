@@ -181,4 +181,38 @@ mod tests {
 
         assert_eq!(got, want);
     }
+
+    #[test]
+    fn test_fft_linearity() {
+        use crate::field::{rand_vec, split};
+        let len = 16;
+        let num_shares = 11;
+        let mut x: Vec<Field64> = rand_vec(len);
+        let mut x_shares = split(&x, num_shares);
+
+        for i in 0..len {
+            if i % 2 != 0 {
+                x_shares[0][i] = x[i]
+            }
+            for j in 1..num_shares {
+                if i % 2 != 0 {
+                    x_shares[j][i] = Field64::zero();
+                }
+            }
+        }
+
+        let mut got = vec![Field64::zero(); len];
+        let mut buf = vec![Field64::zero(); len];
+        for j in 0..num_shares {
+            discrete_fourier_transform_inv(&mut buf, &x_shares[j], len).unwrap();
+            for i in 0..len {
+                got[i] += buf[i];
+            }
+        }
+
+        let mut want = vec![Field64::zero(); len];
+        discrete_fourier_transform_inv(&mut want, &x, len).unwrap();
+
+        assert_eq!(got, want);
+    }
 }

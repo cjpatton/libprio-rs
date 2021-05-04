@@ -123,8 +123,9 @@ use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use crate::fft::{discrete_fourier_transform, discrete_fourier_transform_inv_finish, FftError};
-use crate::field::FieldElement;
+use crate::field::{FieldElement, FieldError};
 use crate::fp::log2;
+use crate::pcp::types::TypeError;
 use crate::polynomial::{poly_deg, poly_eval};
 
 pub mod gadgets;
@@ -176,6 +177,9 @@ pub enum PcpError {
     /// The validity circuit was called with the wrong amount of randomness.
     #[error("incorrect amount of randomness")]
     ValidRandLen,
+
+    #[error("Field error")]
+    Field(#[from] FieldError),
 }
 
 /// A value of a certain type. Implementations of this trait specify an arithmetic circuit that
@@ -235,6 +239,12 @@ where
 
     /// Returns a copy of the associated type parameters for this value.
     fn param(&self) -> Self::Param;
+
+    /// XXX Figure out why, for types that pass joint randomness into gadgets, each random input
+    /// needs to be 0 for helper shares.
+    fn set_leader(&mut self, _is_leader: bool) {
+        // No-op by default.
+    }
 }
 
 /// The gadget functionality required for evaluating a validity circuit. The `Gadget` trait
@@ -403,9 +413,9 @@ where
     // Record the output of the circuit.
     //
     // NOTE The proof of [BBC+19, Theorem 4.3] assumes that the output of the validity circuit is
-    // equal to the output of the last gadget evaluation. Here we relax this assumption, This
-    // should be ok, since it's possible to transform any circuit into one that for which this is
-    // true. (Needs security analysis.)
+    // equal to the output of the last gadget evaluation. Here we relax this assumption. This
+    // should be OK, since it's possible to transform any circuit into one for which this is true.
+    // (Needs security analysis.)
     let mut shim = QueryShimGadget::new(&g, g_calls, pf)?;
     verifier_data.push(x.valid(&mut shim, joint_rand)?);
 
@@ -421,10 +431,10 @@ where
 
     // Evaluate the proof polynomial `p` at `r`.
     //
-    // NOTE Usually `r` is sampled uniformly form the field. Technically speaking, [BBC+19, Theorem
-    // 4.3] requires that r be sampled from the set of field elements *minus* the roots of unity at
-    // which the polynomials are interpolated. This relaxation is fine, but results in a modest
-    // loss of concrete security. (Needs security analysis.)
+    // NOTE Usually `r` is sampled uniformly from the field. Strictly speaking, [BBC+19, Theorem
+    // 4.3] requires that `r` be sampled from the set of field elements *minus* the roots of unity
+    // at which the polynomials are interpolated. This relaxation is fine, but results in a
+    // modest loss of concrete security. (Needs security analysis.)
     verifier_data.push(poly_eval(&pf.data[l..], query_rand[0]));
 
     Ok(Verifier {
