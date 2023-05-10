@@ -1175,6 +1175,7 @@ where
             prefix,
             nonce,
             &mut idpf_eval_cache,
+            None,
         )?);
 
         let r = verify_prng.get();
@@ -1256,7 +1257,7 @@ impl<F> IdpfValue for Poplar1IdpfValue<F>
 where
     F: FieldElement,
 {
-    fn zero() -> Self {
+    fn zero(_length_hint: Option<usize>) -> Self {
         Self([F::zero(); 2])
     }
 }

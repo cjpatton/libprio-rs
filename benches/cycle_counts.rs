@@ -218,7 +218,7 @@ fn idpf_poplar_eval(
     key: &Seed<16>,
 ) {
     let mut cache = RingBufferCache::new(1);
-    idpf::eval(0, public_share, key, input, &[0; 16], &mut cache).unwrap();
+    idpf::eval(0, public_share, key, input, &[0; 16], &mut cache, None).unwrap();
 }
 
 #[cfg(feature = "experimental")]

@@ -150,7 +150,7 @@ pub trait IdpfValue:
     + Sized
 {
     /// Returns the additive identity.
-    fn zero() -> Self;
+    fn zero(length_hint: Option<usize>) -> Self;
 }
 
 /// An output from evaluation of an IDPF at some level and index.
@@ -280,6 +280,7 @@ fn eval_next<V>(
     input_bit: Choice,
     extend_prg_fixed_key: &PrgFixedKeyAes128Key,
     convert_prg_fixed_key: &PrgFixedKeyAes128Key,
+    zero_length_hint: Option<usize>,
 ) -> V
 where
     V: IdpfValue,
@@ -297,8 +298,12 @@ where
     let (new_key, elements) = convert::<V>(&seed_corrected, convert_prg_fixed_key);
     *key = new_key;
 
-    let mut out =
-        elements + V::conditional_select(&V::zero(), &correction_word.value, *control_bit);
+    let mut out = elements
+        + V::conditional_select(
+            &V::zero(zero_length_hint),
+            &correction_word.value,
+            *control_bit,
+        );
     out.conditional_negate(Choice::from((!is_leader) as u8));
     out
 }
@@ -406,6 +411,7 @@ fn eval_from_node<VI, VL>(
     prefix: &IdpfInput,
     binder: &[u8],
     cache: &mut dyn IdpfCache,
+    zero_length_hint: Option<usize>,
 ) -> Result<IdpfOutputShare<VI, VL>, IdpfError>
 where
     VI: IdpfValue,
@@ -440,6 +446,7 @@ where
             Choice::from(*input_bit as u8),
             &extend_prg_fixed_key,
             &convert_prg_fixed_key,
+            zero_length_hint,
         ));
         let cache_key = &prefix[..=level];
         cache.insert(cache_key, &(key, control_bit.unwrap_u8()));
@@ -454,6 +461,7 @@ where
             Choice::from(prefix[bits - 1] as u8),
             &extend_prg_fixed_key,
             &convert_prg_fixed_key,
+            zero_length_hint,
         );
         // Note: there's no point caching this node's key, because we will always run the
         // eval_next() call for the leaf level.
@@ -473,6 +481,7 @@ pub fn eval<VI, VL>(
     prefix: &IdpfInput,
     binder: &[u8],
     cache: &mut dyn IdpfCache,
+    zero_length_hint: Option<usize>,
 ) -> Result<IdpfOutputShare<VI, VL>, IdpfError>
 where
     VI: IdpfValue,
@@ -517,6 +526,7 @@ where
                     prefix,
                     binder,
                     cache,
+                    zero_length_hint,
                 );
             }
             cache_key = &cache_key[..cache_key.len() - 1];
@@ -532,6 +542,7 @@ where
         prefix,
         binder,
         cache,
+        zero_length_hint,
     )
 }
 
@@ -1094,8 +1105,8 @@ mod tests {
         cache_0: &mut dyn IdpfCache,
         cache_1: &mut dyn IdpfCache,
     ) {
-        let share_0 = idpf::eval(0, public_share, &keys[0], prefix, binder, cache_0).unwrap();
-        let share_1 = idpf::eval(1, public_share, &keys[1], prefix, binder, cache_1).unwrap();
+        let share_0 = idpf::eval(0, public_share, &keys[0], prefix, binder, cache_0, None).unwrap();
+        let share_1 = idpf::eval(1, public_share, &keys[1], prefix, binder, cache_1, None).unwrap();
         let output = share_0.merge(share_1).unwrap();
         assert_eq!(&output, expected_output);
     }
@@ -1438,6 +1449,7 @@ mod tests {
             &bitbox![].into(),
             &nonce,
             &mut NoCache::new(),
+            None,
         )
         .is_err());
         // Evaluating with too-long prefix.
@@ -1448,6 +1460,7 @@ mod tests {
             &bitbox![0; 11].into(),
             &nonce,
             &mut NoCache::new(),
+            None,
         )
         .is_err());
     }

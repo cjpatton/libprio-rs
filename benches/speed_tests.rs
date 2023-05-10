@@ -303,7 +303,16 @@ pub fn idpf(c: &mut Criterion) {
 
                 for prefix_length in 1..=size {
                     let prefix = input[..prefix_length].to_owned().into();
-                    idpf::eval(0, &public_share, &keys[0], &prefix, &[0; 16], &mut cache).unwrap();
+                    idpf::eval(
+                        0,
+                        &public_share,
+                        &keys[0],
+                        &prefix,
+                        &[0; 16],
+                        &mut cache,
+                        None,
+                    )
+                    .unwrap();
                 }
             });
         });
