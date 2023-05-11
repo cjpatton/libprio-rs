@@ -197,7 +197,11 @@ fn extend(seed: &[u8; 16], prg_fixed_key: &PrgFixedKeyAes128Key) -> ([[u8; 16]; 
     (seeds, control_bits)
 }
 
-fn convert<V>(seed: &[u8; 16], prg_fixed_key: &PrgFixedKeyAes128Key) -> ([u8; 16], V)
+fn convert<V>(
+    seed: &[u8; 16],
+    prg_fixed_key: &PrgFixedKeyAes128Key,
+    value_length_hint: Option<usize>,
+) -> ([u8; 16], V)
 where
     V: IdpfValue,
 {
@@ -206,7 +210,7 @@ where
     let mut next_seed = [0u8; 16];
     seed_stream.fill(&mut next_seed);
 
-    (next_seed, V::sample(&mut seed_stream))
+    (next_seed, V::sample(&mut seed_stream, value_length_hint))
 }
 
 /// Helper method to update seeds, update control bits, and output the correction word for one level
@@ -218,6 +222,7 @@ fn generate_correction_word<V>(
     control_bits: &mut [Choice; 2],
     extend_prg_fixed_key: &PrgFixedKeyAes128Key,
     convert_prg_fixed_key: &PrgFixedKeyAes128Key,
+    value_length_hint: Option<usize>,
 ) -> IdpfCorrectionWord<V>
 where
     V: IdpfValue,
@@ -254,8 +259,16 @@ where
         conditional_xor_seeds(&seed_1_keep, &cw_seed, previous_control_bits[1]),
     ];
 
-    let (new_key_0, elements_0) = convert::<V>(&seeds_corrected[0], convert_prg_fixed_key);
-    let (new_key_1, elements_1) = convert::<V>(&seeds_corrected[1], convert_prg_fixed_key);
+    let (new_key_0, elements_0) = convert::<V>(
+        &seeds_corrected[0],
+        convert_prg_fixed_key,
+        value_length_hint,
+    );
+    let (new_key_1, elements_1) = convert::<V>(
+        &seeds_corrected[1],
+        convert_prg_fixed_key,
+        value_length_hint,
+    );
 
     keys[0] = new_key_0;
     keys[1] = new_key_1;
@@ -280,7 +293,7 @@ fn eval_next<V>(
     input_bit: Choice,
     extend_prg_fixed_key: &PrgFixedKeyAes128Key,
     convert_prg_fixed_key: &PrgFixedKeyAes128Key,
-    zero_length_hint: Option<usize>,
+    value_length_hint: Option<usize>,
 ) -> V
 where
     V: IdpfValue,
@@ -295,7 +308,8 @@ where
     let seed_corrected = conditional_select_seed(input_bit, &seeds);
     *control_bit = Choice::conditional_select(&control_bits[0], &control_bits[1], input_bit);
 
-    let (new_key, elements) = convert::<V>(&seed_corrected, convert_prg_fixed_key);
+    let (new_key, elements) =
+        convert::<V>(&seed_corrected, convert_prg_fixed_key, value_length_hint);
     *key = new_key;
 
     // XXX This should be done in constant time. We can't use `ConditionallySelectable` because
@@ -303,7 +317,7 @@ where
     //
     //let mut out = elements
     //    + V::conditional_select(
-    //        &V::zero(zero_length_hint),
+    //        &V::zero(value_length_hint),
     //        &correction_word.value,
     //        *control_bit,
     //    );
@@ -311,7 +325,7 @@ where
         + if bool::from(*control_bit) {
             correction_word.value.clone()
         } else {
-            V::zero(zero_length_hint)
+            V::zero(value_length_hint)
         };
     out.conditional_negate(Choice::from((!is_leader) as u8));
     out
@@ -323,6 +337,7 @@ pub(crate) fn gen_with_random<VI, VL, M: IntoIterator<Item = VI>>(
     leaf_value: VL,
     binder: &[u8],
     random: &[[u8; 16]; 2],
+    value_length_hint: Option<usize>,
 ) -> Result<(IdpfPublicShare<VI, VL>, [Seed<16>; 2]), VdafError>
 where
     VI: IdpfValue,
@@ -362,6 +377,7 @@ where
             &mut control_bits,
             &extend_prg_fixed_key,
             &convert_prg_fixed_key,
+            value_length_hint,
         ));
     }
     if inner_correction_words.len() != bits - 1 {
@@ -374,6 +390,7 @@ where
         &mut control_bits,
         &extend_prg_fixed_key,
         &convert_prg_fixed_key,
+        value_length_hint,
     );
     let public_share = IdpfPublicShare {
         inner_correction_words,
@@ -392,6 +409,7 @@ pub fn gen<VI, VL, M>(
     inner_values: M,
     leaf_value: VL,
     binder: &[u8],
+    value_length_hint: Option<usize>,
 ) -> Result<(IdpfPublicShare<VI, VL>, [Seed<16>; 2]), VdafError>
 where
     VI: IdpfValue,
@@ -405,7 +423,14 @@ where
     for random_seed in random.iter_mut() {
         getrandom::getrandom(random_seed)?;
     }
-    gen_with_random(input, inner_values, leaf_value, binder, &random)
+    gen_with_random(
+        input,
+        inner_values,
+        leaf_value,
+        binder,
+        &random,
+        value_length_hint,
+    )
 }
 
 /// Evaluate an IDPF share on `prefix`, starting from a particular tree level with known
@@ -420,7 +445,7 @@ fn eval_from_node<VI, VL>(
     prefix: &IdpfInput,
     binder: &[u8],
     cache: &mut dyn IdpfCache,
-    zero_length_hint: Option<usize>,
+    value_length_hint: Option<usize>,
 ) -> Result<IdpfOutputShare<VI, VL>, IdpfError>
 where
     VI: IdpfValue,
@@ -455,7 +480,7 @@ where
             Choice::from(*input_bit as u8),
             &extend_prg_fixed_key,
             &convert_prg_fixed_key,
-            zero_length_hint,
+            value_length_hint,
         ));
         let cache_key = &prefix[..=level];
         cache.insert(cache_key, &(key, control_bit.unwrap_u8()));
@@ -470,7 +495,7 @@ where
             Choice::from(prefix[bits - 1] as u8),
             &extend_prg_fixed_key,
             &convert_prg_fixed_key,
-            zero_length_hint,
+            value_length_hint,
         );
         // Note: there's no point caching this node's key, because we will always run the
         // eval_next() call for the leaf level.
@@ -490,7 +515,7 @@ pub fn eval<VI, VL>(
     prefix: &IdpfInput,
     binder: &[u8],
     cache: &mut dyn IdpfCache,
-    zero_length_hint: Option<usize>,
+    value_length_hint: Option<usize>,
 ) -> Result<IdpfOutputShare<VI, VL>, IdpfError>
 where
     VI: IdpfValue,
@@ -535,7 +560,7 @@ where
                     prefix,
                     binder,
                     cache,
-                    zero_length_hint,
+                    value_length_hint,
                 );
             }
             cache_key = &cache_key[..cache_key.len() - 1];
@@ -551,7 +576,7 @@ where
         prefix,
         binder,
         cache,
-        zero_length_hint,
+        value_length_hint,
     )
 }
 
@@ -1001,6 +1026,7 @@ mod tests {
             Vec::from([Poplar1IdpfValue::new([Field64::one(), Field64::one()]); 4]),
             Poplar1IdpfValue::new([Field255::one(), Field255::one()]),
             &nonce,
+            None,
         )
         .unwrap();
 
@@ -1144,7 +1170,7 @@ mod tests {
 
         let nonce: [u8; 16] = random();
         let (public_share, keys) =
-            idpf::gen(&input, inner_values.clone(), leaf_values, &nonce).unwrap();
+            idpf::gen(&input, inner_values.clone(), leaf_values, &nonce, None).unwrap();
         let mut cache_0 = RingBufferCache::new(3);
         let mut cache_1 = RingBufferCache::new(3);
 
@@ -1211,7 +1237,7 @@ mod tests {
 
         let nonce: [u8; 16] = random();
         let (public_share, keys) =
-            idpf::gen(&input, inner_values.clone(), leaf_values, &nonce).unwrap();
+            idpf::gen(&input, inner_values.clone(), leaf_values, &nonce, None).unwrap();
         let mut cache_0 = SnoopingCache::new(HashMapCache::new());
         let mut cache_1 = HashMapCache::new();
 
@@ -1388,7 +1414,7 @@ mod tests {
 
         let nonce: [u8; 16] = random();
         let (public_share, keys) =
-            idpf::gen(&input, inner_values.clone(), leaf_values, &nonce).unwrap();
+            idpf::gen(&input, inner_values.clone(), leaf_values, &nonce, None).unwrap();
         let mut cache_0 = LossyCache::new();
         let mut cache_1 = LossyCache::new();
 
@@ -1423,6 +1449,7 @@ mod tests {
             Vec::<Poplar1IdpfValue<Field64>>::new(),
             Poplar1IdpfValue::new([Field255::zero(); 2]),
             &nonce,
+            None,
         )
         .unwrap_err();
 
@@ -1431,6 +1458,7 @@ mod tests {
             Vec::from([Poplar1IdpfValue::new([Field64::zero(); 2]); 9]),
             Poplar1IdpfValue::new([Field255::zero(); 2]),
             &nonce,
+            None,
         )
         .unwrap();
 
@@ -1440,6 +1468,7 @@ mod tests {
             Vec::from([Poplar1IdpfValue::new([Field64::zero(); 2]); 8]),
             Poplar1IdpfValue::new([Field255::zero(); 2]),
             &nonce,
+            None,
         )
         .unwrap_err();
         idpf::gen(
@@ -1447,6 +1476,7 @@ mod tests {
             Vec::from([Poplar1IdpfValue::new([Field64::zero(); 2]); 10]),
             Poplar1IdpfValue::new([Field255::zero(); 2]),
             &nonce,
+            None,
         )
         .unwrap_err();
 
@@ -1928,6 +1958,7 @@ mod tests {
             test_vector.beta_leaf,
             b"some nonce",
             &random,
+            None,
         )
         .unwrap();
 

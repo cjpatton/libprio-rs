@@ -381,13 +381,13 @@ impl SeedStreamFixedKeyAes128 {
 /// Types implementing `CoinToss` can be randomly sampled from a [`SeedStream`].
 pub trait CoinToss {
     /// Randomly generate an object using bytes from a PRG's output stream.
-    fn sample<S>(seed_stream: &mut S) -> Self
+    fn sample<S>(seed_stream: &mut S, length_hint: Option<usize>) -> Self
     where
         S: SeedStream;
 }
 
 impl<const N: usize> CoinToss for [u8; N] {
-    fn sample<S>(seed_stream: &mut S) -> Self
+    fn sample<S>(seed_stream: &mut S, _length_hint: Option<usize>) -> Self
     where
         S: SeedStream,
     {

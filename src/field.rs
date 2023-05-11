@@ -844,7 +844,7 @@ impl<F> CoinToss for F
 where
     F: FieldElement,
 {
-    fn sample<S>(seed_stream: &mut S) -> Self
+    fn sample<S>(seed_stream: &mut S, _length_hint: Option<usize>) -> Self
     where
         S: SeedStream,
     {

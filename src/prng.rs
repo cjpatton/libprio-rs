@@ -236,7 +236,7 @@ mod tests {
         let mut seed_stream = PrgSha3::seed_stream(&seed, b"", b"");
         let mut actual = Field64::zero();
         for _ in 0..=4 {
-            actual = <Field64 as CoinToss>::sample(&mut seed_stream);
+            actual = <Field64 as CoinToss>::sample(&mut seed_stream, None);
         }
         assert_eq!(actual, expected);
     }

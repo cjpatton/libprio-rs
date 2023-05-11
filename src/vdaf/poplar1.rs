@@ -745,6 +745,7 @@ impl<P: Prg<SEED_SIZE>, const SEED_SIZE: usize> Poplar1<P, SEED_SIZE> {
             Poplar1IdpfValue([Field255::one(), auth_leaf]),
             nonce,
             idpf_random,
+            None,
         )?;
 
         // Generate the correlated randomness for the inner nodes. This includes additive shares of
@@ -1339,11 +1340,11 @@ impl<F> CoinToss for Poplar1IdpfValue<F>
 where
     F: CoinToss,
 {
-    fn sample<S>(seed_stream: &mut S) -> Self
+    fn sample<S>(seed_stream: &mut S, _length_hint: Option<usize>) -> Self
     where
         S: SeedStream,
     {
-        Self([F::sample(seed_stream), F::sample(seed_stream)])
+        Self([F::sample(seed_stream, None), F::sample(seed_stream, None)])
     }
 }
 
