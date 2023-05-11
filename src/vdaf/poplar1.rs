@@ -24,7 +24,7 @@ use std::{
     num::TryFromIntError,
     ops::{Add, AddAssign, Sub},
 };
-use subtle::{Choice, ConditionallyNegatable, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallyNegatable, ConstantTimeEq};
 
 const DST_SHARD_RANDOMNESS: u16 = 1;
 const DST_CORR_INNER: u16 = 2;
@@ -1344,18 +1344,6 @@ where
         S: SeedStream,
     {
         Self([F::sample(seed_stream), F::sample(seed_stream)])
-    }
-}
-
-impl<F> ConditionallySelectable for Poplar1IdpfValue<F>
-where
-    F: ConditionallySelectable,
-{
-    fn conditional_select(a: &Self, b: &Self, choice: subtle::Choice) -> Self {
-        Self([
-            F::conditional_select(&a.0[0], &b.0[0], choice),
-            F::conditional_select(&a.0[1], &b.0[1], choice),
-        ])
     }
 }
 

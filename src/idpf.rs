@@ -142,12 +142,12 @@ pub trait IdpfValue:
     Add<Output = Self>
     + AddAssign
     + Sub<Output = Self>
-    + ConditionallySelectable
     + ConditionallyNegatable
     + CoinToss
     + Encode
     + Decode
     + Sized
+    + Clone
 {
     /// Returns the additive identity.
     fn zero(length_hint: Option<usize>) -> Self;
@@ -298,12 +298,21 @@ where
     let (new_key, elements) = convert::<V>(&seed_corrected, convert_prg_fixed_key);
     *key = new_key;
 
+    // XXX This should be done in constant time. We can't use `ConditionallySelectable` because
+    // this implies `Copy`: we have a type downstream t hat wraps a `Vec`, which is not `Copy`.
+    //
+    //let mut out = elements
+    //    + V::conditional_select(
+    //        &V::zero(zero_length_hint),
+    //        &correction_word.value,
+    //        *control_bit,
+    //    );
     let mut out = elements
-        + V::conditional_select(
-            &V::zero(zero_length_hint),
-            &correction_word.value,
-            *control_bit,
-        );
+        + if bool::from(*control_bit) {
+            correction_word.value.clone()
+        } else {
+            V::zero(zero_length_hint)
+        };
     out.conditional_negate(Choice::from((!is_leader) as u8));
     out
 }
