@@ -512,6 +512,82 @@ impl Xof<32> for XofHmacSha256Aes128 {
     }
 }
 
+/// BLAKE3 key!
+#[cfg(all(feature = "crypto-dependencies", feature = "experimental"))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(feature = "crypto-dependencies", feature = "experimental")))
+)]
+pub struct XofBlake3Key {
+    key: blake3::Hash,
+}
+
+#[cfg(all(feature = "crypto-dependencies", feature = "experimental"))]
+impl XofBlake3Key {
+    /// Derive the fixed key from the domain separation tag and binder string.
+    pub fn new(dst: &[u8], binder: &[u8]) -> Self {
+        let mut hasher = blake3::Hasher::new_derive_key("cool");
+        hasher.update(&[dst.len().try_into().expect("dst must be at most 255 bytes")]);
+        hasher.update(dst);
+        hasher.update(binder);
+        let key = hasher.finalize();
+        Self { key }
+    }
+
+    /// Combine a fixed key with a seed to produce a new stream of bytes.
+    pub fn with_seed(&self, seed: &[u8; 16]) -> SeedStreamBlake3 {
+        let mut hasher = blake3::Hasher::new_keyed(self.key.as_bytes());
+        hasher.update(seed);
+        SeedStreamBlake3(hasher.finalize_xof())
+    }
+}
+
+/// BLAKE3!
+#[derive(Clone, Debug)]
+pub struct XofBlake3(blake3::Hasher);
+
+impl Xof<16> for XofBlake3 {
+    type SeedStream = SeedStreamBlake3;
+
+    fn init(seed_bytes: &[u8; 16], dst: &[u8]) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&[dst.len().try_into().expect("dst must be at most 255 bytes")]);
+        hasher.update(dst);
+        hasher.update(seed_bytes);
+        Self(hasher)
+    }
+
+    fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+
+    fn into_seed_stream(self) -> SeedStreamBlake3 {
+        SeedStreamBlake3(self.0.finalize_xof())
+    }
+}
+
+/// BLAKE3 seed stream!
+pub struct SeedStreamBlake3(blake3::OutputReader);
+
+impl RngCore for SeedStreamBlake3 {
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.0.fill(dest);
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        self.0.fill(dest);
+        Ok(())
+    }
+
+    fn next_u32(&mut self) -> u32 {
+        next_u32_via_fill(self)
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        next_u64_via_fill(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
