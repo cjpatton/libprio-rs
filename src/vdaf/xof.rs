@@ -200,6 +200,37 @@ impl Debug for SeedStreamAes128 {
     }
 }
 
+/// TurboSHAKE128 key!
+pub struct XofTurboShake128Key {
+    key: [u8; 16],
+}
+
+#[cfg(all(feature = "crypto-dependencies", feature = "experimental"))]
+impl XofTurboShake128Key {
+    /// Derive the fixed key from the domain separation tag and binder string.
+    pub fn new(dst: &[u8], binder: &[u8]) -> Self {
+        let mut hasher = TurboShake128::from_core(TurboShake128Core::new(
+            XOF_TURBO_SHAKE_128_DOMAIN_SEPARATION,
+        ));
+        Update::update(
+            &mut hasher,
+            &[dst.len().try_into().expect("dst must be at most 255 bytes")],
+        );
+        Update::update(&mut hasher, dst);
+        Update::update(&mut hasher, binder);
+        let mut key = [0; 16];
+        XofReader::read(&mut hasher.finalize_xof(), &mut key[..]);
+        Self { key }
+    }
+
+    /// Combine a fixed key with a seed to produce a new stream of bytes.
+    pub fn with_seed(&self, seed: &[u8; 16]) -> SeedStreamTurboShake128 {
+        let mut xof = XofTurboShake128::init(&self.key, b"");
+        xof.update(seed);
+        xof.into_seed_stream()
+    }
+}
+
 /// The XOF based on TurboSHAKE128 as specified in [[draft-irtf-cfrg-vdaf-08]].
 ///
 /// [draft-irtf-cfrg-vdaf-08]: https://datatracker.ietf.org/doc/draft-irtf-cfrg-vdaf/08/
