@@ -207,7 +207,7 @@ fn prio3(c: &mut Criterion) {
     group.finish();
 
     let mut group = c.benchmark_group("prio3sumvec_shard");
-    for (input_length, chunk_length) in [(10, 3), (100, 10), (1_000, 31)] {
+    for (input_length, chunk_length) in [(10, 3), (100, 10), (1_000, 31), (100_000, 1_000)] {
         group.bench_with_input(
             BenchmarkId::new("serial", input_length),
             &(input_length, chunk_length),
