@@ -626,13 +626,33 @@ where
     ) -> Result<F, FlpError> {
         self.valid_call_check(input, joint_rand)?;
 
-        parallel_sum_range_checks(
-            &mut g[0],
-            input,
-            joint_rand[0],
-            self.chunk_length,
-            num_shares,
-        )
+        let f_num_shares = F::from(F::valid_integer_try_from::<usize>(num_shares)?);
+        let num_shares_inverse = f_num_shares.inv();
+
+        let mut output = F::zero();
+        let mut padded_chunk = vec![F::zero(); 2 * self.chunk_length];
+
+        let mut jr = joint_rand.iter();
+        for chunk in input.chunks(self.chunk_length) {
+            // Construct arguments for the Mul subcircuits.
+            for (input, args) in chunk.iter().zip(padded_chunk.chunks_exact_mut(2)) {
+                args[0] = *jr.next().unwrap() * *input;
+                args[1] = *input - num_shares_inverse;
+            }
+            // If the chunk of the input is smaller than chunk_length, use zeros instead of measurement
+            // inputs for the remaining calls.
+            for args in padded_chunk[chunk.len() * 2..].chunks_exact_mut(2) {
+                args[0] = F::zero();
+                args[1] = -num_shares_inverse;
+                // Skip updating r_power. This inner loop is only used during the last iteration of the
+                // outer loop, if the last input chunk is a partial chunk. Thus, r_power won't be
+                // accessed again before returning.
+            }
+
+            output += g[0].call(&padded_chunk)?;
+        }
+
+        Ok(output)
     }
 
     fn truncate(&self, input: Vec<F>) -> Result<Vec<F>, FlpError> {
@@ -661,7 +681,7 @@ where
     }
 
     fn joint_rand_len(&self) -> usize {
-        1
+        self.flattened_len
     }
 
     fn prove_rand_len(&self) -> usize {
