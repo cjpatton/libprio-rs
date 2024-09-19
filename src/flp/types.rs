@@ -634,10 +634,13 @@ where
 
         let mut jr = joint_rand.iter();
         for chunk in input.chunks(self.chunk_length) {
+            let r = *jr.next().unwrap();
+            let mut r_power = r;
             // Construct arguments for the Mul subcircuits.
             for (input, args) in chunk.iter().zip(padded_chunk.chunks_exact_mut(2)) {
-                args[0] = *jr.next().unwrap() * *input;
+                args[0] = r_power * *input;
                 args[1] = *input - num_shares_inverse;
+                r_power *= r;
             }
             // If the chunk of the input is smaller than chunk_length, use zeros instead of measurement
             // inputs for the remaining calls.
@@ -681,7 +684,7 @@ where
     }
 
     fn joint_rand_len(&self) -> usize {
-        self.flattened_len
+        self.gadget_calls
     }
 
     fn prove_rand_len(&self) -> usize {
