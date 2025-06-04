@@ -51,7 +51,7 @@ use subtle::{Choice, ConstantTimeEq};
 
 /// Input of [`Xof`].
 #[derive(Clone, Debug)]
-pub struct Seed<const SEED_SIZE: usize>(pub(crate) [u8; SEED_SIZE]);
+pub struct Seed<const SEED_SIZE: usize>(pub [u8; SEED_SIZE]);
 
 impl<const SEED_SIZE: usize> Distribution<Seed<SEED_SIZE>> for StandardUniform {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Seed<SEED_SIZE> {
@@ -211,7 +211,8 @@ impl Debug for SeedStreamAes128 {
 pub struct XofTurboShake128(TurboShake128);
 
 impl XofTurboShake128 {
-    pub(crate) fn from_seed_slice(seed_bytes: &[u8], dst_parts: &[&[u8]]) -> Self {
+    /// XXX
+    pub fn from_seed_slice(seed_bytes: &[u8], dst_parts: &[&[u8]]) -> Self {
         let mut xof = Self(TurboShake128::from_core(TurboShake128Core::new(
             XOF_TURBO_SHAKE_128_DOMAIN_SEPARATION,
         )));

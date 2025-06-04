@@ -16,7 +16,7 @@
 
 pub mod benchmarked;
 #[cfg(all(feature = "crypto-dependencies", feature = "experimental"))]
-mod bt;
+pub mod bt;
 pub mod codec;
 #[cfg(feature = "experimental")]
 #[cfg_attr(docsrs, doc(cfg(feature = "experimental")))]

@@ -823,7 +823,8 @@ where
 
 impl<V> Eq for IdpfCorrectionWord<V> where V: ConstantTimeEq {}
 
-pub(crate) fn xor_seeds(left: &[u8; 16], right: &[u8; 16]) -> [u8; 16] {
+/// XXX
+pub fn xor_seeds(left: &[u8; 16], right: &[u8; 16]) -> [u8; 16] {
     let mut seed = [0u8; 16];
     for (a, (b, c)) in left.iter().zip(right.iter().zip(seed.iter_mut())) {
         *c = a ^ b;
@@ -857,7 +858,7 @@ fn control_bit_to_seed_mask(control: Choice) -> [u8; 16] {
 
 /// Take two seeds and a control bit, and return the first seed if the control bit is zero, or the
 /// XOR of the two seeds if the control bit is one. This does not branch on the control bit.
-pub(crate) fn conditional_xor_seeds(
+pub fn conditional_xor_seeds(
     normal_input: &[u8; 16],
     switched_input: &[u8; 16],
     control: Choice,
@@ -878,7 +879,7 @@ pub(crate) fn conditional_select_seed(select: Choice, seeds: &[[u8; 16]; 2]) -> 
 }
 
 /// Interchange the contents of seeds if the choice is 1, otherwise seeds remain unchanged.
-pub(crate) fn conditional_swap_seed(lhs: &mut [u8; 16], rhs: &mut [u8; 16], choice: Choice) {
+pub fn conditional_swap_seed(lhs: &mut [u8; 16], rhs: &mut [u8; 16], choice: Choice) {
     zip(lhs, rhs).for_each(|(a, b)| u8::conditional_swap(a, b, choice));
 }
 

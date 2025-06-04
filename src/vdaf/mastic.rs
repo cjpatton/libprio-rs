@@ -46,11 +46,15 @@ pub(crate) const USAGE_JOINT_RAND: u8 = 5;
 pub(crate) const USAGE_ONEHOT_CHECK: u8 = 6;
 pub(crate) const USAGE_PAYLOAD_CHECK: u8 = 7;
 pub(crate) const USAGE_EVAL_PROOF: u8 = 8;
-pub(crate) const USAGE_NODE_PROOF: u8 = 9;
-pub(crate) const USAGE_EXTEND: u8 = 10;
-pub(crate) const USAGE_CONVERT: u8 = 11;
+/// XXX
+pub const USAGE_NODE_PROOF: u8 = 9;
+/// XXX
+pub const USAGE_EXTEND: u8 = 10;
+/// XXX
+pub const USAGE_CONVERT: u8 = 11;
 
-pub(crate) fn dst_usage(usage: u8) -> [u8; 8] {
+/// XXX
+pub fn dst_usage(usage: u8) -> [u8; 8] {
     const VERSION: u8 = 0;
     [b'm', b'a', b's', b't', b'i', b'c', VERSION, usage]
 }
